@@ -1,0 +1,24 @@
+# Architecture
+
+Zebra Label Tool is intentionally split into small modules so contributors can extend one part without breaking the rest.
+
+## Core boundary
+
+`layout.py` and `zpl.py` are the most important modules. They must stay independent from GUI frameworks and printer APIs.
+
+- `layout.py` calculates label dimensions and positions in printer dots.
+- `zpl.py` converts the requested label into ZPL.
+
+Both are covered by tests and can run on every platform.
+
+## UI boundary
+
+`app.py` and `preview.py` contain the CustomTkinter/Tkinter desktop UI. The preview uses the same layout calculation as the ZPL generator. This prevents the preview and printer output from drifting apart.
+
+## Printing boundary
+
+`printing.py` currently implements Windows RAW printing through `pywin32`. Future printer backends, such as TCP port 9100 network printing, should be added behind this boundary instead of being mixed into the UI.
+
+## Settings boundary
+
+`settings.py` stores user settings in a per-user config path. Local runtime settings are intentionally ignored by git.

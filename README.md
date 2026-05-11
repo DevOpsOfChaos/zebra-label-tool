@@ -1,1 +1,161 @@
-# zebra-label-tool
+# Zebra Label Tool
+
+A lightweight desktop utility for creating, previewing, copying, and printing simple Zebra/ZPL labels.
+
+The goal is not to replace a full vendor label-design suite. The goal is speed: open the tool, type a label, preview it, copy the generated ZPL, or print it directly to an installed Zebra-compatible Windows printer.
+
+## Why this exists
+
+Zebra printers are reliable, and ZPL is powerful. Everyday label creation can still be slower than it needs to be when you only want a fast workshop, lab, storage, IT, or production label.
+
+Zebra Label Tool focuses on a small workflow:
+
+1. choose label size and DPI,
+2. enter one or two text lines,
+3. optionally add border, inversion, or a Code128 barcode,
+4. preview the result,
+5. print or copy the generated ZPL.
+
+## Current status
+
+Early public prototype. The core ZPL/layout logic is separated and tested. The desktop UI is functional and kept intentionally simple.
+
+Windows RAW printing is supported through `pywin32`. On non-Windows systems the ZPL generator and CLI can still be used, but direct printer discovery/printing is disabled.
+
+## Features
+
+- Simple one-line and two-line label editor
+- Live canvas preview using the same layout calculation as the ZPL generator
+- ZPL generation for Zebra-compatible printers
+- Copy generated ZPL to the clipboard
+- Export generated ZPL to a `.zpl` file
+- Direct RAW printing to installed Windows printers
+- Common DPI presets: 203, 300, 600
+- Common label size shortcuts
+- Font size control
+- Optional inverted label output
+- Optional border
+- Optional Code128 barcode
+- Templates
+- Print history
+- CLI mode for generating ZPL without starting the GUI
+- Testable core modules for future contributors
+
+## Screenshots
+
+Screenshots are intentionally not committed yet. Add real screenshots after verifying the GUI on an actual Windows machine and printer setup.
+
+Suggested future files:
+
+- `docs/screenshots/main-window.png`
+- `docs/screenshots/preview-example.png`
+- `docs/screenshots/windows-printer-selection.png`
+
+## Installation from source
+
+### Windows PowerShell
+
+```powershell
+git clone https://github.com/DevOpsOfChaos/zebra-label-tool.git
+cd zebra-label-tool
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+python main.py
+```
+
+### Editable developer install
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+pip install -e ".[dev]"
+pytest -q
+python main.py
+```
+
+## Usage
+
+### Start the GUI
+
+```powershell
+python main.py
+```
+
+or, after editable install:
+
+```powershell
+zebra-label-tool-gui
+```
+
+### Generate ZPL from the command line
+
+```powershell
+python -m zebra_label_tool "Sonderverschraubungen" --width-mm 57 --height-mm 17 --dpi 300
+```
+
+Example with two lines and a barcode:
+
+```powershell
+python -m zebra_label_tool "Shelf A-12" "Box 04" --barcode "A12-04" --border
+```
+
+## Project structure
+
+```text
+src/zebra_label_tool/
+  app.py        # CustomTkinter desktop app
+  cli.py        # command line ZPL generation
+  layout.py     # pure label geometry/layout calculations
+  preview.py    # canvas preview
+  printing.py   # Windows RAW printing backend
+  settings.py   # per-user settings persistence
+  zpl.py        # pure ZPL generation
+tests/          # core regression tests
+```
+
+## Development
+
+Run the checks before committing:
+
+```powershell
+python -m compileall .
+pytest -q
+```
+
+The ZPL/layout modules should remain GUI-free and printer-free. That is the main extension point for contributors.
+
+## Roadmap
+
+Near-term:
+
+- Add real screenshots
+- Add packaged Windows release build
+- Add QR code support
+- Add `.zpl` import from the GUI
+- Improve validation and user-facing error messages
+
+Later:
+
+- Network printer backend for TCP port 9100
+- CSV batch printing
+- More barcode types
+- Template sharing
+- Better preview/rendering options
+
+## Contributing
+
+Small, focused pull requests are preferred. Good first contributions:
+
+- add tests for new ZPL output variants,
+- improve docs,
+- add screenshots,
+- add label presets,
+- improve error messages,
+- add printer backend implementations without changing the ZPL core.
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).

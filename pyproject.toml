@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zebra-label-tool"
+version = "0.1.0"
+description = "Lightweight desktop utility for generating, previewing, copying, and printing simple Zebra/ZPL labels."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "DevOpsOfChaos" }
+]
+keywords = ["zebra", "zpl", "labels", "printing", "thermal-printer"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Win32 (MS Windows)",
+  "Intended Audience :: End Users/Desktop",
+  "Intended Audience :: Manufacturing",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Office/Business",
+  "Topic :: Printing",
+]
+dependencies = [
+  "customtkinter>=5.2.0",
+  "pywin32>=306; platform_system == 'Windows'",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+
+[project.scripts]
+zebra-label-tool = "zebra_label_tool.cli:main"
+zebra-label-tool-gui = "zebra_label_tool.app:run"
+
+[project.urls]
+Homepage = "https://github.com/DevOpsOfChaos/zebra-label-tool"
+Issues = "https://github.com/DevOpsOfChaos/zebra-label-tool/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
