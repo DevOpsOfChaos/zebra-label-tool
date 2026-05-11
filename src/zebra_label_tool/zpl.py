@@ -131,8 +131,8 @@ def generate_zpl(
         barcode_height=effective_barcode_height,
     )
 
-    printable_w = max(1, layout.pw - MARGIN_X * 2 - max(0, abs(offset_x)))
-    text_x = max(0, MARGIN_X + offset_x)
+    printable_w = max(1, layout.text_w)
+    text_x = max(0, layout.text_x)
     zpl = ["^XA", f"^PW{layout.pw}", f"^LL{layout.ll}", "^LH0,0"]
 
     if copies > 1:
@@ -155,7 +155,7 @@ def generate_zpl(
         zpl += _barcode_zpl(
             barcode_type=barcode_type,
             barcode_text=barcode_text,
-            x=max(0, MARGIN_X + offset_x),
+            x=max(0, layout.bar_x),
             y=layout.pos_y_bar,
             height=layout.bar_h,
             show_text=bool(barcode_show_text),

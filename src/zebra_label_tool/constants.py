@@ -18,6 +18,7 @@ DPI_OPTIONS = {
 }
 
 DEFAULT_SETTINGS = {
+    "language": None,
     "printer": "",
     "dpi": 300,
     "width_mm": 57,

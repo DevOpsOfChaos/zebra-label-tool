@@ -30,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--border", action="store_true", help="Draw a border")
     parser.add_argument("--barcode", default="", help="Optional barcode/2D-code content")
     parser.add_argument("--barcode-type", choices=list(BARCODE_TYPES), default="code128", help="Barcode/2D-code type")
-    parser.add_argument("--barcode-pos", choices=["above", "below"], default="below")
+    parser.add_argument("--barcode-pos", choices=["above", "below", "left", "right"], default="below")
     parser.add_argument("--barcode-height", type=str, default="40", help="Linear barcode height or reserved 2D-code area in dots")
     parser.add_argument("--hide-barcode-text", action="store_true", help="Hide human-readable text below linear barcodes")
     parser.add_argument("--barcode-magnification", type=str, default="4", help="QR/Data Matrix module magnification")

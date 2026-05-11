@@ -52,3 +52,13 @@ The preview uses the same layout calculation as the ZPL generator. This prevents
 ## Barcode and QR preview strategy
 
 ZPL output remains the source of truth for the printer. The local preview uses real encoders for Code 128, Code 39, EAN-13, UPC-A and QR Code so users see meaningful scanner-like codes instead of decorative placeholders. Data Matrix and PDF417 are still generated as real ZPL commands and shown with deterministic layout previews until a dedicated local renderer is introduced.
+
+## UI language model
+
+The desktop UI uses a small built-in translation registry in `i18n.py`. English and German are currently included. The selected language is stored in the per-user settings file. If no language has been saved yet, the GUI asks once on first start before building the main window.
+
+Adding more languages is intentionally lightweight: add the language key to `SUPPORTED_LANGUAGES`, add a translation dictionary in `TRANSLATIONS`, and use existing keys for menu/dialog/main-window labels. The hard part is not code structure; it is keeping translations complete and reviewed by a competent speaker.
+
+## Label/code area layout
+
+The layout core supports code areas `above`, `below`, `left`, and `right`. Left/right layouts reserve a side area for barcode/QR/Data Matrix/PDF417 and reduce the text block width accordingly. The existing code size setting is used as the reserved side-area size to keep the main UI compact.

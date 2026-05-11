@@ -68,3 +68,11 @@ pip install -r requirements.txt
 ```
 
 The local QR preview uses the `qrcode` package. The generated ZPL can still be copied/exported, but the GUI preview needs that package installed.
+
+## The program starts in the wrong language
+
+Open **Settings > Language / Sprache** and choose the desired language. The selected language is stored in the user settings file and is reused on the next start.
+
+## Barcode/QR area overlaps text
+
+Use the compact **Label layout** area in the main window. For side-by-side labels choose **Right side** or **Left side** for the code area and increase the code-area size. For very small labels, reduce font size or enable Auto-fit.

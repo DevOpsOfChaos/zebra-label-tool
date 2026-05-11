@@ -106,17 +106,18 @@ class LabelPreviewCanvas(tk.Canvas):
         font = ("Helvetica", -fs_px, "bold")
         line_gap_px = int(layout.line_gap * scale)
         text_y = oy + int(layout.pos_y_text * scale)
-        margin_px = int((MARGIN_X + int(offset_x)) * scale)
+        text_area_x = ox + int(layout.text_x * scale)
+        text_area_w = max(1, int(layout.text_w * scale))
 
         if alignment == "left":
             anchor = "nw"
-            text_x = ox + margin_px
+            text_x = text_area_x
         elif alignment == "right":
             anchor = "ne"
-            text_x = ox + lw - margin_px
+            text_x = text_area_x + text_area_w
         else:
             anchor = "n"
-            text_x = ox + lw // 2
+            text_x = text_area_x + text_area_w // 2
 
         rotate_hint = "" if str(rotation).lower() == "normal" else f"  text rotation: {rotation}"
         placeholder_used = not any(line.strip() for line in text_lines)
@@ -129,17 +130,18 @@ class LabelPreviewCanvas(tk.Canvas):
             self.create_text(text_x, y, text=line, fill=color, font=font, anchor=anchor)
 
         if layout.has_bar:
+            bar_x_px = ox + int(layout.bar_x * scale)
             bar_y_px = oy + int(layout.pos_y_bar * scale)
+            bar_w_px = max(18, int(layout.bar_w * scale))
             bar_h_px = max(12, int(layout.bar_h * scale))
             self._draw_symbol(
-                ox,
+                bar_x_px,
                 bar_y_px,
-                lw,
+                bar_w_px,
                 bar_h_px,
                 txt_col,
                 barcode_text,
                 scale,
-                int(offset_x),
                 barcode_type,
                 bool(barcode_show_text),
                 int(barcode_magnification or 4),
@@ -153,20 +155,19 @@ class LabelPreviewCanvas(tk.Canvas):
             font=("Helvetica", 9),
         )
 
-    def _draw_symbol(self, ox, bar_y, lw, bar_h, color, text, scale, offset_x, barcode_type, show_text, magnification):
+    def _draw_symbol(self, x, bar_y, width, bar_h, color, text, scale, barcode_type, show_text, magnification):
         if is_2d_barcode(barcode_type):
-            self._draw_2d_code(ox, bar_y, lw, bar_h, color, text, scale, offset_x, barcode_type, magnification)
+            self._draw_2d_code(x, bar_y, width, bar_h, color, text, scale, barcode_type, magnification)
         else:
-            self._draw_linear_barcode(ox, bar_y, lw, bar_h, color, text, scale, offset_x, barcode_type, show_text)
+            self._draw_linear_barcode(x, bar_y, width, bar_h, color, text, scale, barcode_type, show_text)
 
-    def _draw_linear_barcode(self, ox, bar_y, lw, bar_h, color, text, scale, offset_x=0, barcode_type="code128", show_text=True):
-        margin = max(4, int((MARGIN_X + offset_x) * scale))
-        bx = ox + margin
-        bw = max(8, lw - margin * 2)
+    def _draw_linear_barcode(self, x, bar_y, width, bar_h, color, text, scale, barcode_type="code128", show_text=True):
+        bx = x
+        bw = max(8, width)
         try:
             symbol = encode_linear_symbol(barcode_type, text)
         except Exception as exc:
-            self.create_text(ox + lw // 2, bar_y + 4, text=f"Barcode error: {exc}", fill="#dc2626", font=("Helvetica", 10), anchor="n")
+            self.create_text(x + width // 2, bar_y + 4, text=f"Barcode error: {exc}", fill="#dc2626", font=("Helvetica", 10), anchor="n")
             return
 
         quiet = max(4, int(10 * scale))
@@ -176,17 +177,17 @@ class LabelPreviewCanvas(tk.Canvas):
         module_w = draw_w / total_modules
         bar_body_h = bar_h * (0.72 if show_text else 0.88)
 
-        x = draw_x
+        draw_cursor = draw_x
         for is_bar, units in symbol.modules:
             w = units * module_w
             if is_bar:
                 # integer-ish coordinates keep the preview crisp at normal scales
-                self.create_rectangle(round(x), bar_y, round(x + w), bar_y + bar_body_h, fill=color, outline="")
-            x += w
+                self.create_rectangle(round(draw_cursor), bar_y, round(draw_cursor + w), bar_y + bar_body_h, fill=color, outline="")
+            draw_cursor += w
 
         if show_text:
             self.create_text(
-                ox + lw // 2,
+                x + width // 2,
                 bar_y + bar_h * 0.77,
                 text=symbol.label[:34] + ("..." if len(symbol.label) > 34 else ""),
                 fill=color,
@@ -194,12 +195,12 @@ class LabelPreviewCanvas(tk.Canvas):
                 anchor="n",
             )
 
-    def _draw_2d_code(self, ox, bar_y, lw, bar_h, color, text, scale, offset_x=0, barcode_type="qr", magnification=4):
-        margin = max(4, int((MARGIN_X + offset_x) * scale))
+    def _draw_2d_code(self, x, bar_y, width, bar_h, color, text, scale, barcode_type="qr", magnification=4):
+        margin = max(2, int(4 * scale))
         try:
             symbol = encode_matrix_symbol(barcode_type, text, magnification=magnification)
         except Exception as exc:
-            self.create_text(ox + lw // 2, bar_y + 4, text=f"2D code error: {exc}", fill="#dc2626", font=("Helvetica", 10), anchor="n")
+            self.create_text(x + width // 2, bar_y + 4, text=f"2D code error: {exc}", fill="#dc2626", font=("Helvetica", 10), anchor="n")
             return
 
         rows = len(symbol.cells)
@@ -207,7 +208,7 @@ class LabelPreviewCanvas(tk.Canvas):
         if not rows or not cols:
             return
 
-        max_w = max(20, lw - margin * 2)
+        max_w = max(20, width - margin * 2)
         if barcode_type == "pdf417":
             target_w = max_w
             cell = min(target_w / cols, max(2, bar_h / max(rows, 1)))
@@ -219,7 +220,7 @@ class LabelPreviewCanvas(tk.Canvas):
             draw_w = cols * cell
             draw_h = rows * cell
 
-        x0 = ox + (lw - draw_w) / 2
+        x0 = x + (width - draw_w) / 2
         y0 = bar_y
         bg = "#ffffff" if color != "#ffffff" else "#111827"
         self.create_rectangle(x0 - 2, y0 - 2, x0 + draw_w + 2, y0 + draw_h + 2, fill=bg, outline=color)
@@ -237,7 +238,7 @@ class LabelPreviewCanvas(tk.Canvas):
                     )
         if not symbol.exact:
             self.create_text(
-                ox + lw // 2,
+                x + width // 2,
                 y0 + draw_h + 4,
                 text=f"{BARCODE_TYPES[normalize_barcode_type(barcode_type)].label} preview",
                 fill=COL_MUTED,

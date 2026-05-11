@@ -10,7 +10,7 @@ from .layout import LINE_GAP, normalize_text_lines
 from .zpl import SUPPORTED_ALIGNMENTS, SUPPORTED_FONT_STYLES, SUPPORTED_ROTATIONS, generate_zpl
 
 SUPPORTED_DPI = (203, 300, 600)
-SUPPORTED_BARCODE_POSITIONS = ("above", "below")
+SUPPORTED_BARCODE_POSITIONS = ("above", "below", "left", "right")
 MAX_TEXT_LINES = 12
 
 
@@ -126,7 +126,7 @@ class LabelSpec:
 
         parsed_barcode_pos = str(barcode_pos or "below").strip().split()[0].lower()
         if parsed_barcode_pos not in SUPPORTED_BARCODE_POSITIONS:
-            raise LabelSpecError("Barcode position must be above or below")
+            raise LabelSpecError("Barcode position must be above, below, left, or right")
 
         parsed_barcode_enabled = _parse_bool(barcode)
         raw_barcode_text = str(barcode_text or "")

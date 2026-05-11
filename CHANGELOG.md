@@ -21,6 +21,13 @@
 - Built-in preset input dialogs so barcode/QR presets can be filled before applying.
 - Additional built-in presets for Wi-Fi QR labels, part-number labels, and retail EAN labels.
 
+- Persistent UI language selection with built-in English and German.
+- First-start language prompt when no language has been saved yet.
+- Settings menu with language switching.
+- Compact main-window label layout area for label size, code position, and code-area size.
+- Side code areas so barcodes/QR codes can sit left or right of the text.
+- Tests for side code-area layout and translation fallback.
+
 ### Changed
 
 - The red clear button now resets label text, selected template state, and active barcode/QR payload instead of only clearing text.
@@ -32,6 +39,11 @@
 - Current setup moved to the bottom of the preview side so it no longer competes with label text entry.
 - ZPL remains available on demand instead of occupying the main window.
 - Documentation now describes presets, batch generation, and the cleaner menu workflow.
+
+- Recent labels were removed from the main GUI to reduce noise.
+- Templates moved to the bottom of the main panel.
+- Label setup now includes code area position and reserved code size.
+- The text options dialog uses readable cancel/apply button styling.
 
 ### Fixed
 

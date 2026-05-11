@@ -34,6 +34,7 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Direct RAW printing to installed Windows printers
 - Common DPI presets: 203, 300, 600
 - Common label size shortcuts
+- Compact main-window label layout area for size, code position, and code-area size
 - Built-in presets for device labels, asset tags, QR device links, Wi-Fi QR labels, part numbers, retail EAN labels, storage bins, and cable markers
 - Main-window text controls for font size, alignment, and auto-fit
 - Enter in the text editor adds another printed line instead of printing accidentally
@@ -43,13 +44,14 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Optional linear barcodes: Code 128, Code 39, EAN-13, UPC-A with real local preview patterns
 - Optional 2D codes: QR Code, Data Matrix, PDF417. QR preview uses a real QR matrix; Data Matrix/PDF417 are printer-rendered from ZPL and shown with deterministic layout previews.
 - Barcode/QR setup through the top menu to keep the main window clean
+- Side-by-side label layouts: place barcode/QR/Data Matrix/PDF417 code areas above, below, left, or right of the text
 - Top menu workflow for Label, Text, Barcode/QR, ZPL, text cleanup, and batch tools
 - Text cleanup actions: trim whitespace, remove empty lines, uppercase, lowercase, title case, and wrap long lines
 - Batch label ZPL generation from pasted text blocks
 - Layout quality warnings for auto-fit, empty labels, long barcodes, and line limits
 - Built-in presets with fill-in dialogs when a preset contains a barcode/QR payload
-- Templates
-- Print history
+- Templates moved to the bottom of the main panel
+- Persistent UI language setting with English and German built in
 - Safer input validation before print/copy/export
 - Clean shutdown behavior from GUI close, Escape, or terminal interrupt
 - CLI mode for generating ZPL without starting the GUI
@@ -131,10 +133,10 @@ Example with multiple lines and a barcode:
 python -m zebra_label_tool "Shelf A-12" "Box 04" --line "Batch 7" --barcode "A12-04" --border
 ```
 
-Example with QR code:
+Example with QR code on the right side of the text:
 
 ```powershell
-python -m zebra_label_tool "Device" "ESP32" --barcode "https://example.local/device/1" --barcode-type qr --barcode-magnification 5
+python -m zebra_label_tool "Device" "ESP32" --barcode "https://example.local/device/1" --barcode-type qr --barcode-pos right --barcode-height 120 --barcode-magnification 5
 ```
 
 Example with text options:
@@ -154,6 +156,7 @@ src/zebra_label_tool/
   layout.py     # pure label geometry/layout calculations
   preview.py    # canvas preview
   preview_symbols.py # local barcode/QR preview pattern builders
+  i18n.py      # built-in English/German UI translations
   presets.py    # built-in workflow presets and preset input fields
   text_tools.py # editor cleanup/wrapping helpers
   label_spec.py # shared validated label request model
@@ -183,6 +186,7 @@ Near-term:
 - Add network printer backend for TCP port 9100
 - Improve visual polish after real Windows review
 - Add batch preview and CSV import
+- Add more UI languages through the translation registry
 
 Later:
 

@@ -118,3 +118,11 @@ def test_generate_ean13_adds_check_digit_for_12_digit_payload():
 def test_generate_upca_adds_check_digit_for_11_digit_payload():
     zpl = generate_zpl("Retail", "", 57, 29, 32, barcode=True, barcode_text="03600029145", barcode_type="upca")
     assert "^FD036000291452^FS" in zpl
+
+
+def test_generate_side_barcode_reserves_text_area():
+    zpl = generate_zpl("Device", "ESP32", 57, 29, 32, barcode=True, barcode_text="DEV-1", barcode_pos="right", barcode_height=100)
+    assert "^FDDevice\\&ESP32^FS" in zpl
+    assert "^FDDEV-1^FS" in zpl
+    # Text block width is reduced when a side code area is reserved.
+    assert "^FB" in zpl

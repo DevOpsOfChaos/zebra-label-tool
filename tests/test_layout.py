@@ -84,3 +84,27 @@ def test_calc_positions_keeps_legacy_dict_shape():
     assert result["pw"] == 673
     assert result["num_lines"] == 2
     assert "pos_y_text" in result
+
+
+def test_calculate_layout_with_barcode_right_reserves_side_area():
+    layout = calculate_layout(
+        line1="Device",
+        line2="ESP32",
+        width_mm=57,
+        height_mm=29,
+        font_size=32,
+        dpi=300,
+        barcode=True,
+        barcode_text="DEV-1",
+        barcode_pos="right",
+    )
+    assert layout.has_bar is True
+    assert layout.bar_x > layout.text_x
+    assert layout.text_w < layout.pw
+    assert layout.bar_w >= 24
+
+
+def test_calculate_layout_with_barcode_left_places_text_after_code_area():
+    layout = calculate_layout("A", "", 57, 29, 32, 300, True, "CODE", "left")
+    assert layout.bar_x < layout.text_x
+    assert layout.text_w > 0

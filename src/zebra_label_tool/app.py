@@ -28,6 +28,7 @@ from .constants import (
     DPI_OPTIONS,
     MAX_HISTORY,
 )
+from .i18n import SUPPORTED_LANGUAGES, normalize_language, translate
 from .label_spec import LabelSpec, LabelSpecError, MAX_TEXT_LINES
 from .layout import calculate_layout_for_lines, mm_to_dots
 from .presets import BUILTIN_PRESETS, get_builtin_preset, render_preset_settings
@@ -41,7 +42,24 @@ from .zpl_import import parse_simple_zpl
 FONT_STYLE_LABELS = ["A0  (smooth)", "A  (Bitmap)"]
 ALIGNMENT_LABELS = ["center", "left", "right", "justify"]
 ROTATION_LABELS = ["normal", "90", "180", "270"]
-BARCODE_POSITION_LABELS = ["below  (bottom)", "above  (top)"]
+BARCODE_POSITION_KEYS = ["below", "above", "right", "left"]
+
+
+def _position_label(language: str | None, position: str) -> str:
+    key = str(position or "below").strip().split()[0].lower()
+    return translate(language, f"position.{key}")
+
+
+def _position_key(value: str) -> str:
+    raw = str(value or "below").strip().lower()
+    for key in BARCODE_POSITION_KEYS:
+        if raw == key or raw.startswith(key) or raw == translate("en", f"position.{key}").lower() or raw == translate("de", f"position.{key}").lower():
+            return key
+    return "below"
+
+
+def _position_labels(language: str | None) -> list[str]:
+    return [_position_label(language, key) for key in BARCODE_POSITION_KEYS]
 
 
 def _short_number(value: float | int) -> str:
@@ -59,6 +77,8 @@ class ZebraApp(ctk.CTk):
         ctk.set_default_color_theme("blue")
         self.configure(fg_color=COL_BG)
         self.settings = load_settings()
+        self.lang = normalize_language(self.settings.get("language"))
+        self._language_missing = self.settings.get("language") not in SUPPORTED_LANGUAGES
         self._init_variables()
         self._closing = False
         self._status_after_id = None
@@ -72,10 +92,64 @@ class ZebraApp(ctk.CTk):
         self.minsize(940, 620)
         self.protocol("WM_DELETE_WINDOW", self._safe_close)
         self._bind_shortcuts()
+        if self._language_missing:
+            self._ask_initial_language()
         self._build_menu()
         self._build_ui()
         self._load_values()
         self.after(120, self._update_all)
+
+
+    def _t(self, key: str, **kwargs: object) -> str:
+        return translate(self.lang, key, **kwargs)
+
+    def _ask_initial_language(self) -> None:
+        """Ask for the UI language once before the main window is built."""
+        win = ctk.CTkToplevel(self)
+        win.title(translate("en", "language.select_title"))
+        win.geometry("420x210")
+        win.transient(self)
+        win.grab_set()
+        win.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(win, text="Zebra Label Tool", font=ctk.CTkFont(size=18, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w", padx=18, pady=(18, 4))
+        ctk.CTkLabel(
+            win,
+            text="Choose your language / Sprache auswählen",
+            font=ctk.CTkFont(size=13),
+            text_color=COL_MUTED,
+        ).grid(row=1, column=0, sticky="w", padx=18, pady=(0, 12))
+        ctk.CTkLabel(
+            win,
+            text="You can change this later in Settings.\nDu kannst die Sprache später in den Einstellungen ändern.",
+            justify="left",
+            text_color=COL_MUTED,
+        ).grid(row=2, column=0, sticky="ew", padx=18, pady=(0, 14))
+        buttons = ctk.CTkFrame(win, fg_color="transparent")
+        buttons.grid(row=3, column=0, sticky="ew", padx=18, pady=(0, 18))
+        buttons.grid_columnconfigure(0, weight=1)
+        buttons.grid_columnconfigure(1, weight=1)
+
+        def choose(language: str) -> None:
+            self.lang = language
+            self.settings["language"] = language
+            save_settings(self.settings)
+            win.destroy()
+
+        ctk.CTkButton(buttons, text="Deutsch", height=36, command=lambda: choose("de")).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ctk.CTkButton(buttons, text="English", height=36, fg_color=COL_CARD, text_color=COL_TEXT, border_width=1, border_color=COL_BORDER, hover_color=COL_CARD_ALT, command=lambda: choose("en")).grid(row=0, column=1, sticky="ew", padx=(6, 0))
+        self.wait_window(win)
+
+    def _set_language(self, language: str) -> None:
+        self.lang = normalize_language(language)
+        self.settings["language"] = self.lang
+        save_settings(self.settings)
+        for child in list(self.winfo_children()):
+            child.destroy()
+        self._build_menu()
+        self._build_ui()
+        self._load_values()
+        self._update_all()
+        self._status("Sprache gespeichert" if self.lang == "de" else "Language saved", COL_SUCCESS)
 
     def _init_variables(self) -> None:
         """Create Tk variables before widgets are built so controls stay bound."""
@@ -91,7 +165,7 @@ class ZebraApp(ctk.CTk):
         self.barcode_var = tk.BooleanVar(value=bool(self.settings.get("barcode", False)))
         self.barcode_text_var = tk.StringVar(value=str(self.settings.get("barcode_text", "")))
         self.barcode_type_var = tk.StringVar(value=barcode_label(str(self.settings.get("barcode_type", "code128"))))
-        self.barcode_pos_var = tk.StringVar(value="above  (top)" if self.settings.get("barcode_pos", "below") == "above" else "below  (bottom)")
+        self.barcode_pos_var = tk.StringVar(value=_position_label(self.lang, self.settings.get("barcode_pos", "below")))
         self.barcode_height_var = tk.StringVar(value=str(self.settings.get("barcode_height", 40)))
         self.barcode_show_text_var = tk.BooleanVar(value=bool(self.settings.get("barcode_show_text", True)))
         self.barcode_magnification_var = tk.StringVar(value=str(self.settings.get("barcode_magnification", 4)))
@@ -117,26 +191,26 @@ class ZebraApp(ctk.CTk):
         menubar = tk.Menu(self)
 
         file_menu = tk.Menu(menubar, tearoff=False)
-        file_menu.add_command(label="New label", accelerator="Ctrl+N", command=self._reset_label)
+        file_menu.add_command(label=self._t("action.new_label"), accelerator="Ctrl+N", command=self._reset_label)
         file_menu.add_separator()
-        file_menu.add_command(label="Import ZPL...", command=self._import_zpl)
-        file_menu.add_command(label="Export ZPL...", command=self._export_zpl)
-        file_menu.add_command(label="Copy ZPL", command=self._copy_zpl)
+        file_menu.add_command(label=self._t("action.import_zpl"), command=self._import_zpl)
+        file_menu.add_command(label=self._t("action.export_zpl"), command=self._export_zpl)
+        file_menu.add_command(label=self._t("action.copy_zpl"), command=self._copy_zpl)
         file_menu.add_separator()
-        file_menu.add_command(label="Print", accelerator="Ctrl+P", command=self._on_print)
+        file_menu.add_command(label=self._t("action.print"), accelerator="Ctrl+P", command=self._on_print)
         file_menu.add_separator()
-        file_menu.add_command(label="Exit", accelerator="Esc", command=self._safe_close)
-        menubar.add_cascade(label="File", menu=file_menu)
+        file_menu.add_command(label=self._t("action.exit"), accelerator="Esc", command=self._safe_close)
+        menubar.add_cascade(label=self._t("menu.file"), menu=file_menu)
 
         edit_menu = tk.Menu(menubar, tearoff=False)
-        edit_menu.add_command(label="Clear label content", command=self._clear_label_content)
-        edit_menu.add_command(label="Use barcode text from label", command=self._barcode_from_first_line)
+        edit_menu.add_command(label=self._t("action.clear_content"), command=self._clear_label_content)
+        edit_menu.add_command(label=self._t("action.use_barcode_from_label"), command=self._barcode_from_first_line)
         edit_menu.add_separator()
-        edit_menu.add_command(label="Save current settings", accelerator="Ctrl+S", command=self._save_all_settings)
-        menubar.add_cascade(label="Edit", menu=edit_menu)
+        edit_menu.add_command(label=self._t("action.save_settings"), accelerator="Ctrl+S", command=self._save_all_settings)
+        menubar.add_cascade(label=self._t("menu.edit"), menu=edit_menu)
 
         label_menu = tk.Menu(menubar, tearoff=False)
-        label_menu.add_command(label="Label setup...", accelerator="Ctrl+L", command=self._open_label_setup)
+        label_menu.add_command(label=self._t("action.label_setup"), accelerator="Ctrl+L", command=self._open_label_setup)
         label_menu.add_separator()
         for label, width, height in [("57 x 19 mm", 57, 19), ("57 x 17 mm", 57, 17), ("62 x 29 mm", 62, 29), ("100 x 50 mm", 100, 50)]:
             label_menu.add_command(label=label, command=lambda w=width, h=height: self._set_size(w, h))
@@ -144,11 +218,11 @@ class ZebraApp(ctk.CTk):
         preset_menu = tk.Menu(label_menu, tearoff=False)
         for preset in BUILTIN_PRESETS:
             preset_menu.add_command(label=preset.name, command=lambda name=preset.name: self._apply_builtin_preset(name))
-        label_menu.add_cascade(label="Apply built-in preset", menu=preset_menu)
-        menubar.add_cascade(label="Label", menu=label_menu)
+        label_menu.add_cascade(label="Built-in presets", menu=preset_menu)
+        menubar.add_cascade(label=self._t("menu.label"), menu=label_menu)
 
         text_menu = tk.Menu(menubar, tearoff=False)
-        text_menu.add_command(label="Text options...", accelerator="Ctrl+T", command=self._open_text_options)
+        text_menu.add_command(label=self._t("action.text_options"), accelerator="Ctrl+T", command=self._open_text_options)
         text_menu.add_separator()
         text_menu.add_command(label="Clean up whitespace", command=lambda: self._format_text("cleanup"))
         text_menu.add_command(label="Remove empty lines", command=lambda: self._format_text("remove_empty"))
@@ -160,38 +234,50 @@ class ZebraApp(ctk.CTk):
         text_menu.add_separator()
         for alignment in ALIGNMENT_LABELS:
             text_menu.add_command(label=f"Align {alignment}", command=lambda a=alignment: self._set_alignment(a))
-        menubar.add_cascade(label="Text", menu=text_menu)
+        menubar.add_cascade(label=self._t("menu.text"), menu=text_menu)
 
         barcode_menu = tk.Menu(menubar, tearoff=False)
-        barcode_menu.add_command(label="Barcode / QR options...", accelerator="Ctrl+B", command=self._open_barcode_options)
-        barcode_menu.add_command(label="Use first label line as payload", command=self._barcode_from_first_line)
+        barcode_menu.add_command(label=self._t("action.barcode_options"), accelerator="Ctrl+B", command=self._open_barcode_options)
+        barcode_menu.add_command(label=self._t("action.use_barcode_from_label"), command=self._barcode_from_first_line)
         barcode_menu.add_command(label="Toggle code", command=self._toggle_barcode)
         barcode_menu.add_separator()
         type_menu = tk.Menu(barcode_menu, tearoff=False)
         for barcode in BARCODE_TYPES.values():
             type_menu.add_command(label=barcode.label, command=lambda key=barcode.key: self._set_barcode_type(key))
         barcode_menu.add_cascade(label="Symbology", menu=type_menu)
+        position_menu = tk.Menu(barcode_menu, tearoff=False)
+        for key in BARCODE_POSITION_KEYS:
+            position_menu.add_command(label=_position_label(self.lang, key), command=lambda pos=key: self._set_barcode_position(pos))
+        barcode_menu.add_cascade(label=self._t("field.position"), menu=position_menu)
         barcode_menu.add_separator()
         barcode_menu.add_command(label="Disable code", command=lambda: (self.barcode_var.set(False), self._update_all()))
-        menubar.add_cascade(label="Barcode / QR", menu=barcode_menu)
+        menubar.add_cascade(label=self._t("menu.barcode"), menu=barcode_menu)
 
         tools_menu = tk.Menu(menubar, tearoff=False)
-        tools_menu.add_command(label="Batch labels...", accelerator="Ctrl+Shift+B", command=self._open_batch_window)
+        tools_menu.add_command(label=self._t("action.batch"), accelerator="Ctrl+Shift+B", command=self._open_batch_window)
         tools_menu.add_separator()
-        tools_menu.add_command(label="Reset layout options", command=self._reset_layout_options)
-        menubar.add_cascade(label="Tools", menu=tools_menu)
+        tools_menu.add_command(label=self._t("action.reset_layout"), command=self._reset_layout_options)
+        menubar.add_cascade(label=self._t("menu.tools"), menu=tools_menu)
 
         view_menu = tk.Menu(menubar, tearoff=False)
-        view_menu.add_command(label="Show ZPL...", command=self._open_zpl_window)
-        view_menu.add_command(label="Refresh preview", accelerator="F5", command=self._update_all)
-        menubar.add_cascade(label="View", menu=view_menu)
+        view_menu.add_command(label=self._t("action.show_zpl"), command=self._open_zpl_window)
+        view_menu.add_command(label=self._t("action.refresh_preview"), accelerator="F5", command=self._update_all)
+        menubar.add_cascade(label=self._t("menu.view"), menu=view_menu)
+
+        settings_menu = tk.Menu(menubar, tearoff=False)
+        language_menu = tk.Menu(settings_menu, tearoff=False)
+        language_menu.add_command(label=self._t("language.german"), command=lambda: self._set_language("de"))
+        language_menu.add_command(label=self._t("language.english"), command=lambda: self._set_language("en"))
+        settings_menu.add_cascade(label="Language / Sprache", menu=language_menu)
+        settings_menu.add_command(label=self._t("action.save_settings"), command=self._save_all_settings)
+        menubar.add_cascade(label=self._t("menu.settings"), menu=settings_menu)
 
         help_menu = tk.Menu(menubar, tearoff=False)
-        help_menu.add_command(label="Quick guide", command=self._show_quick_guide)
-        help_menu.add_command(label="Keyboard shortcuts", command=self._show_shortcuts)
+        help_menu.add_command(label=self._t("action.quick_guide"), command=self._show_quick_guide)
+        help_menu.add_command(label=self._t("action.shortcuts"), command=self._show_shortcuts)
         help_menu.add_separator()
-        help_menu.add_command(label="About", command=self._show_about)
-        menubar.add_cascade(label="Help", menu=help_menu)
+        help_menu.add_command(label=self._t("action.about"), command=self._show_about)
+        menubar.add_cascade(label=self._t("menu.help"), menu=help_menu)
 
         self.configure(menu=menubar)
 
@@ -214,7 +300,7 @@ class ZebraApp(ctk.CTk):
         ctk.CTkLabel(header, text=APP_TITLE, font=ctk.CTkFont(size=21, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w")
         ctk.CTkLabel(
             header,
-            text="Fast local Zebra/ZPL label creation",
+            text=self._t("app.tagline"),
             font=ctk.CTkFont(size=11),
             text_color=COL_MUTED,
         ).grid(row=1, column=0, sticky="w")
@@ -234,8 +320,8 @@ class ZebraApp(ctk.CTk):
         self.printer_dd.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         ctk.CTkButton(
             printer,
-            text="Refresh",
-            width=76,
+            text=self._t("action.refresh"),
+            width=86,
             height=34,
             fg_color=COL_SOFT,
             text_color=COL_TEXT,
@@ -249,7 +335,7 @@ class ZebraApp(ctk.CTk):
         actions.grid_columnconfigure(1, weight=1)
         self.print_btn = ctk.CTkButton(
             actions,
-            text="Print label",
+            text=self._t("action.print_label"),
             height=42,
             font=ctk.CTkFont(size=14, weight="bold"),
             fg_color=COL_ACCENT,
@@ -259,7 +345,7 @@ class ZebraApp(ctk.CTk):
         self.print_btn.grid(row=0, column=0, sticky="ew", padx=(0, 6))
         ctk.CTkButton(
             actions,
-            text="New",
+            text=self._t("action.new"),
             height=42,
             fg_color=COL_CARD,
             text_color=COL_TEXT,
@@ -288,15 +374,14 @@ class ZebraApp(ctk.CTk):
             command=self._clear_label_content,
         )
         self.clear_text_btn.grid(row=0, column=0, sticky="w", padx=(0, 8))
-        ctk.CTkLabel(text_header, text="Label text", font=ctk.CTkFont(size=14, weight="bold"), text_color=COL_TEXT).grid(row=0, column=1, sticky="w")
+        ctk.CTkLabel(text_header, text=self._t("panel.label_text"), font=ctk.CTkFont(size=14, weight="bold"), text_color=COL_TEXT).grid(row=0, column=1, sticky="w")
         self.text_counter_lbl = ctk.CTkLabel(text_header, text="", font=ctk.CTkFont(size=11), text_color=COL_MUTED)
         self.text_counter_lbl.grid(row=0, column=2, sticky="e")
 
         text_controls = ctk.CTkFrame(text_card, fg_color=COL_CARD_ALT, corner_radius=10)
         text_controls.grid(row=1, column=0, sticky="ew", padx=10, pady=(2, 8))
         text_controls.grid_columnconfigure(1, weight=1)
-        text_controls.grid_columnconfigure(3, weight=0)
-        ctk.CTkLabel(text_controls, text="Font", text_color=COL_MUTED, font=ctk.CTkFont(size=11)).grid(row=0, column=0, sticky="w", padx=(10, 6), pady=8)
+        ctk.CTkLabel(text_controls, text=self._t("panel.font"), text_color=COL_MUTED, font=ctk.CTkFont(size=11)).grid(row=0, column=0, sticky="w", padx=(10, 6), pady=8)
         self.font_slider = ctk.CTkSlider(text_controls, from_=8, to=160, number_of_steps=152, variable=self.font_size_var, command=self._on_inline_font_size)
         self.font_slider.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=8)
         self.font_size_inline_lbl = ctk.CTkLabel(text_controls, text=str(self.font_size_var.get()), width=34, text_color=COL_TEXT)
@@ -309,14 +394,14 @@ class ZebraApp(ctk.CTk):
         quick_tools.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
         for col in range(4):
             quick_tools.grid_columnconfigure(col, weight=1)
-        ctk.CTkButton(quick_tools, text="Options", height=28, fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, font=ctk.CTkFont(size=11), command=self._open_text_options).grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        ctk.CTkButton(quick_tools, text="Clean", height=28, fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, font=ctk.CTkFont(size=11), command=lambda: self._format_text("cleanup")).grid(row=0, column=1, sticky="ew", padx=(0, 6))
-        ctk.CTkButton(quick_tools, text="Wrap", height=28, fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, font=ctk.CTkFont(size=11), command=self._wrap_text_dialog).grid(row=0, column=2, sticky="ew", padx=(0, 6))
-        ctk.CTkButton(quick_tools, text="Case", height=28, fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, font=ctk.CTkFont(size=11), command=lambda: self._format_text("uppercase")).grid(row=0, column=3, sticky="ew")
+        ctk.CTkButton(quick_tools, text=self._t("panel.options"), height=28, fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, font=ctk.CTkFont(size=11), command=self._open_text_options).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ctk.CTkButton(quick_tools, text=self._t("panel.clean"), height=28, fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, font=ctk.CTkFont(size=11), command=lambda: self._format_text("cleanup")).grid(row=0, column=1, sticky="ew", padx=(0, 6))
+        ctk.CTkButton(quick_tools, text=self._t("panel.wrap"), height=28, fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, font=ctk.CTkFont(size=11), command=self._wrap_text_dialog).grid(row=0, column=2, sticky="ew", padx=(0, 6))
+        ctk.CTkButton(quick_tools, text=self._t("panel.case"), height=28, fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, font=ctk.CTkFont(size=11), command=lambda: self._format_text("uppercase")).grid(row=0, column=3, sticky="ew")
 
         ctk.CTkLabel(
             text_card,
-            text=f"Enter adds a printed line. Use Ctrl+P or the Print label button to print. Up to {MAX_TEXT_LINES} lines.",
+            text=self._t("panel.text_hint", max_lines=MAX_TEXT_LINES),
             font=ctk.CTkFont(size=10),
             text_color=COL_MUTED,
         ).grid(row=3, column=0, sticky="w", padx=10)
@@ -335,19 +420,32 @@ class ZebraApp(ctk.CTk):
         self.text_box.bind("<Return>", self._text_box_return)
         self.text_box.bind("<KeyRelease>", lambda _: self._update_all())
 
-        lower = ctk.CTkFrame(left, fg_color="transparent")
-        lower.grid(row=4, column=0, sticky="ew", padx=12, pady=(0, 8))
-        lower.grid_columnconfigure(0, weight=1)
-        self.template_var = tk.StringVar(value="- choose template -")
-        self.template_dd = ctk.CTkOptionMenu(lower, variable=self.template_var, values=self._template_names(), height=30, command=self._load_template)
-        self.template_dd.grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        ctk.CTkButton(lower, text="Save template", width=110, height=30, fg_color=COL_CARD, text_color=COL_TEXT, border_width=1, border_color=COL_BORDER, hover_color=COL_CARD_ALT, command=self._save_template).grid(row=0, column=1, padx=(0, 6))
-        ctk.CTkButton(lower, text="Delete", width=70, height=30, fg_color=COL_CARD, text_color=COL_ERR, border_width=1, border_color=COL_BORDER, hover_color="#fee2e2", command=self._delete_template).grid(row=0, column=2)
+        layout_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
+        layout_card.grid(row=4, column=0, sticky="ew", padx=12, pady=(0, 8))
+        layout_card.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(layout_card, text=self._t("panel.layout"), font=ctk.CTkFont(size=12, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, columnspan=4, sticky="w", padx=10, pady=(8, 2))
+        ctk.CTkLabel(layout_card, text=self._t("panel.size"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=1, column=0, sticky="w", padx=(10, 6), pady=(4, 8))
+        self.inline_size_var = tk.StringVar(value=self._size_label())
+        self.inline_size_dd = ctk.CTkOptionMenu(layout_card, variable=self.inline_size_var, values=["57 x 19 mm", "57 x 17 mm", "62 x 29 mm", "100 x 50 mm", "Custom"], width=118, height=28, command=self._on_inline_size)
+        self.inline_size_dd.grid(row=1, column=1, sticky="ew", padx=(0, 8), pady=(4, 8))
+        ctk.CTkLabel(layout_card, text=self._t("panel.code_area"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=1, column=2, sticky="w", padx=(0, 6), pady=(4, 8))
+        self.inline_code_pos = ctk.CTkOptionMenu(layout_card, variable=self.barcode_pos_var, values=_position_labels(self.lang), width=132, height=28, command=lambda _: self._update_all())
+        self.inline_code_pos.grid(row=1, column=3, sticky="ew", padx=(0, 10), pady=(4, 8))
+        ctk.CTkLabel(layout_card, text=self._t("panel.code_size"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=2, column=0, sticky="w", padx=(10, 6), pady=(0, 10))
+        self.inline_code_size = ctk.CTkEntry(layout_card, textvariable=self.barcode_height_var, width=78, height=28)
+        self.inline_code_size.grid(row=2, column=1, sticky="w", padx=(0, 8), pady=(0, 10))
+        self.inline_code_size.bind("<KeyRelease>", lambda _: self._update_all())
+        ctk.CTkButton(layout_card, text=self._t("action.more"), height=28, fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, command=self._open_label_setup).grid(row=2, column=3, sticky="ew", padx=(0, 10), pady=(0, 10))
 
-        self.history_frame = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
-        self.history_frame.grid(row=5, column=0, sticky="ew", padx=12, pady=(0, 12))
-        self.history_frame.grid_columnconfigure(0, weight=1)
-        self._rebuild_history()
+        template_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
+        template_card.grid(row=5, column=0, sticky="ew", padx=12, pady=(0, 12))
+        template_card.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(template_card, text=self._t("panel.templates"), font=ctk.CTkFont(size=12, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, columnspan=3, sticky="w", padx=10, pady=(8, 2))
+        self.template_var = tk.StringVar(value="- choose template -")
+        self.template_dd = ctk.CTkOptionMenu(template_card, variable=self.template_var, values=self._template_names(), height=30, command=self._load_template)
+        self.template_dd.grid(row=1, column=0, sticky="ew", padx=(10, 6), pady=(2, 10))
+        ctk.CTkButton(template_card, text="Save", width=78, height=30, fg_color=COL_CARD, text_color=COL_TEXT, border_width=1, border_color=COL_BORDER, hover_color=COL_CARD_ALT, command=self._save_template).grid(row=1, column=1, padx=(0, 6), pady=(2, 10))
+        ctk.CTkButton(template_card, text="Delete", width=72, height=30, fg_color=COL_CARD, text_color=COL_ERR, border_width=1, border_color=COL_BORDER, hover_color="#fee2e2", command=self._delete_template).grid(row=1, column=2, padx=(0, 10), pady=(2, 10))
 
     def _build_right_panel(self) -> None:
         right = ctk.CTkFrame(self, fg_color=COL_PANEL)
@@ -358,7 +456,7 @@ class ZebraApp(ctk.CTk):
         header = ctk.CTkFrame(right, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 8))
         header.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(header, text="Live preview", font=ctk.CTkFont(size=16, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(header, text=self._t("panel.live_preview"), font=ctk.CTkFont(size=16, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w")
         self.preview_info = ctk.CTkLabel(header, text="", font=ctk.CTkFont(size=11), text_color=COL_MUTED)
         self.preview_info.grid(row=0, column=1, sticky="e")
 
@@ -372,7 +470,7 @@ class ZebraApp(ctk.CTk):
         summary = ctk.CTkFrame(right, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
         summary.grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 10))
         summary.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(summary, text="Current setup", font=ctk.CTkFont(size=12, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 0))
+        ctk.CTkLabel(summary, text=self._t("panel.current_setup"), font=ctk.CTkFont(size=12, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 0))
         self.setup_summary_lbl = ctk.CTkLabel(summary, text="", justify="left", anchor="w", font=ctk.CTkFont(size=11), text_color=COL_MUTED)
         self.setup_summary_lbl.grid(row=1, column=0, sticky="ew", padx=10, pady=(2, 0))
         self.quality_lbl = ctk.CTkLabel(summary, text="", justify="left", anchor="w", font=ctk.CTkFont(size=11), text_color=COL_MUTED)
@@ -383,7 +481,7 @@ class ZebraApp(ctk.CTk):
         footer.grid_columnconfigure(0, weight=1)
         self.preview_hint = ctk.CTkLabel(
             footer,
-            text="Tip: Enter creates another label line. Advanced label, barcode/QR and ZPL tools are in the top menu.",
+            text=self._t("panel.preview_tip"),
             font=ctk.CTkFont(size=11),
             text_color=COL_MUTED,
         )
@@ -437,7 +535,7 @@ class ZebraApp(ctk.CTk):
         self.barcode_var.set(bool(s.get("barcode", False)))
         self.barcode_text_var.set(str(s.get("barcode_text", "")))
         self.barcode_type_var.set(barcode_label(str(s.get("barcode_type", "code128"))))
-        self.barcode_pos_var.set("above  (top)" if s.get("barcode_pos", "below") == "above" else "below  (bottom)")
+        self.barcode_pos_var.set(_position_label(self.lang, s.get("barcode_pos", "below")))
         self.barcode_height_var.set(str(s.get("barcode_height", 40)))
         self.barcode_show_text_var.set(bool(s.get("barcode_show_text", True)))
         self.barcode_magnification_var.set(str(s.get("barcode_magnification", 4)))
@@ -449,6 +547,10 @@ class ZebraApp(ctk.CTk):
         self.auto_fit_var.set(bool(s.get("auto_fit", True)))
         if hasattr(self, "font_size_inline_lbl"):
             self.font_size_inline_lbl.configure(text=str(self.font_size_var.get()))
+        if hasattr(self, "inline_size_var"):
+            self.inline_size_var.set(self._size_label())
+        if hasattr(self, "inline_code_pos"):
+            self.inline_code_pos.configure(values=_position_labels(self.lang))
 
         lines = s.get("text_lines")
         if not lines:
@@ -469,7 +571,7 @@ class ZebraApp(ctk.CTk):
             barcode=self.barcode_var.get(),
             barcode_text=self.barcode_text_var.get(),
             barcode_type=barcode_key_from_label(self.barcode_type_var.get()),
-            barcode_pos=self.barcode_pos_var.get(),
+            barcode_pos=_position_key(self.barcode_pos_var.get()),
             barcode_height=self.barcode_height_var.get() or 40,
             barcode_show_text=self.barcode_show_text_var.get(),
             barcode_magnification=self.barcode_magnification_var.get() or 4,
@@ -581,24 +683,27 @@ class ZebraApp(ctk.CTk):
         return win
 
     def _open_label_setup(self, _=None) -> None:
-        win = self._dialog("Label setup", 460, 440)
+        win = self._dialog(self._t("dialog.label_setup"), 480, 510)
         frame = ctk.CTkFrame(win, fg_color=COL_PANEL)
         frame.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
         frame.grid_columnconfigure(1, weight=1)
 
-        width_entry = self._dialog_entry(frame, 0, "Width (mm)", self.width_var.get())
-        height_entry = self._dialog_entry(frame, 1, "Height (mm)", self.height_var.get())
-        copies_entry = self._dialog_entry(frame, 2, "Copies", self.copies_var.get())
+        width_entry = self._dialog_entry(frame, 0, self._t("field.width"), self.width_var.get())
+        height_entry = self._dialog_entry(frame, 1, self._t("field.height"), self.height_var.get())
+        copies_entry = self._dialog_entry(frame, 2, self._t("field.copies"), self.copies_var.get())
         dpi_var = tk.StringVar(value=self.dpi_var.get())
-        ctk.CTkLabel(frame, text="Printer DPI").grid(row=3, column=0, sticky="w", padx=10, pady=8)
+        ctk.CTkLabel(frame, text=self._t("field.printer_dpi")).grid(row=3, column=0, sticky="w", padx=10, pady=8)
         ctk.CTkOptionMenu(frame, variable=dpi_var, values=list(DPI_OPTIONS.keys())).grid(row=3, column=1, sticky="ew", padx=10, pady=8)
         border_var = tk.BooleanVar(value=self.border_var.get())
         inverted_var = tk.BooleanVar(value=self.inverted_var.get())
-        ctk.CTkCheckBox(frame, text="Draw border", variable=border_var).grid(row=4, column=1, sticky="w", padx=10, pady=8)
-        ctk.CTkCheckBox(frame, text="Inverted label", variable=inverted_var).grid(row=5, column=1, sticky="w", padx=10, pady=8)
+        ctk.CTkCheckBox(frame, text=self._t("field.draw_border"), variable=border_var).grid(row=4, column=1, sticky="w", padx=10, pady=8)
+        ctk.CTkCheckBox(frame, text=self._t("field.inverted_label"), variable=inverted_var).grid(row=5, column=1, sticky="w", padx=10, pady=8)
+        code_pos_var = tk.StringVar(value=self.barcode_pos_var.get())
+        self._dialog_option(frame, 6, self._t("field.position"), code_pos_var, _position_labels(self.lang))
+        code_size_entry = self._dialog_entry(frame, 7, self._t("field.code_size"), self.barcode_height_var.get())
 
         presets = ctk.CTkFrame(frame, fg_color="transparent")
-        presets.grid(row=6, column=0, columnspan=2, sticky="ew", padx=10, pady=(6, 10))
+        presets.grid(row=8, column=0, columnspan=2, sticky="ew", padx=10, pady=(6, 10))
         for col, (label, w, h) in enumerate([("57x19", 57, 19), ("57x17", 57, 17), ("62x29", 62, 29), ("100x50", 100, 50)]):
             presets.grid_columnconfigure(col, weight=1)
             ctk.CTkButton(presets, text=label, fg_color=COL_CARD, hover_color=COL_BORDER, command=lambda ww=w, hh=h: (self._set_entry(width_entry, ww), self._set_entry(height_entry, hh))).grid(row=0, column=col, sticky="ew", padx=3)
@@ -610,36 +715,40 @@ class ZebraApp(ctk.CTk):
             self.dpi_var.set(dpi_var.get())
             self.border_var.set(border_var.get())
             self.inverted_var.set(inverted_var.get())
+            self.barcode_pos_var.set(code_pos_var.get())
+            self.barcode_height_var.set(code_size_entry.get())
+            if hasattr(self, "inline_code_pos"):
+                self.inline_code_pos.configure(values=_position_labels(self.lang))
             self._update_all()
             win.destroy()
 
-        self._dialog_buttons(frame, 7, apply, win.destroy)
+        self._dialog_buttons(frame, 9, apply, win.destroy)
 
     def _open_text_options(self, _=None) -> None:
-        win = self._dialog("Text options", 500, 520)
+        win = self._dialog(self._t("dialog.text_options"), 500, 520)
         frame = ctk.CTkFrame(win, fg_color=COL_PANEL)
         frame.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
         frame.grid_columnconfigure(1, weight=1)
 
         font_size = ctk.CTkSlider(frame, from_=8, to=160, number_of_steps=152)
         font_size.set(int(self.font_size_var.get()))
-        ctk.CTkLabel(frame, text="Font size").grid(row=0, column=0, sticky="w", padx=10, pady=8)
+        ctk.CTkLabel(frame, text=self._t("field.font_size")).grid(row=0, column=0, sticky="w", padx=10, pady=8)
         font_size.grid(row=0, column=1, sticky="ew", padx=10, pady=8)
         font_size_lbl = ctk.CTkLabel(frame, text=str(int(font_size.get())), width=40)
         font_size_lbl.grid(row=0, column=2, padx=10, pady=8)
         font_size.configure(command=lambda value: font_size_lbl.configure(text=str(int(float(value)))))
 
         font_style_var = tk.StringVar(value=self.font_style_var.get())
-        self._dialog_option(frame, 1, "Font style", font_style_var, FONT_STYLE_LABELS)
+        self._dialog_option(frame, 1, self._t("field.font_style"), font_style_var, FONT_STYLE_LABELS)
         alignment_var = tk.StringVar(value=self.alignment_var.get())
-        self._dialog_option(frame, 2, "Alignment", alignment_var, ALIGNMENT_LABELS)
+        self._dialog_option(frame, 2, self._t("field.alignment"), alignment_var, ALIGNMENT_LABELS)
         rotation_var = tk.StringVar(value=self.rotation_var.get())
-        self._dialog_option(frame, 3, "Rotation", rotation_var, ROTATION_LABELS)
-        line_gap = self._dialog_entry(frame, 4, "Line gap (dots)", self.line_gap_var.get())
-        offset_x = self._dialog_entry(frame, 5, "Horizontal offset (dots)", self.offset_x_var.get())
-        offset_y = self._dialog_entry(frame, 6, "Vertical offset (dots)", self.offset_y_var.get())
+        self._dialog_option(frame, 3, self._t("field.rotation"), rotation_var, ROTATION_LABELS)
+        line_gap = self._dialog_entry(frame, 4, self._t("field.line_gap"), self.line_gap_var.get())
+        offset_x = self._dialog_entry(frame, 5, self._t("field.offset_x"), self.offset_x_var.get())
+        offset_y = self._dialog_entry(frame, 6, self._t("field.offset_y"), self.offset_y_var.get())
         auto_fit_var = tk.BooleanVar(value=self.auto_fit_var.get())
-        ctk.CTkCheckBox(frame, text="Auto-fit font to available height", variable=auto_fit_var).grid(row=7, column=1, sticky="w", padx=10, pady=8)
+        ctk.CTkCheckBox(frame, text=self._t("field.auto_fit"), variable=auto_fit_var).grid(row=7, column=1, sticky="w", padx=10, pady=8)
 
         def apply() -> None:
             self.font_size_var.set(int(font_size.get()))
@@ -656,30 +765,30 @@ class ZebraApp(ctk.CTk):
         self._dialog_buttons(frame, 8, apply, win.destroy)
 
     def _open_barcode_options(self, _=None) -> None:
-        win = self._dialog("Barcode / QR options", 520, 500)
+        win = self._dialog(self._t("dialog.barcode_options"), 540, 520)
         frame = ctk.CTkFrame(win, fg_color=COL_PANEL)
         frame.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
         frame.grid_columnconfigure(1, weight=1)
 
         enabled_var = tk.BooleanVar(value=self.barcode_var.get())
         type_var = tk.StringVar(value=self.barcode_type_var.get())
-        content_entry = self._dialog_entry(frame, 2, "Payload", self.barcode_text_var.get())
+        content_entry = self._dialog_entry(frame, 2, self._t("field.payload"), self.barcode_text_var.get())
         position_var = tk.StringVar(value=self.barcode_pos_var.get())
-        height_entry = self._dialog_entry(frame, 4, "Height / reserved area (dots)", self.barcode_height_var.get())
-        mag_entry = self._dialog_entry(frame, 5, "QR/Data Matrix magnification", self.barcode_magnification_var.get())
+        height_entry = self._dialog_entry(frame, 4, self._t("field.code_size"), self.barcode_height_var.get())
+        mag_entry = self._dialog_entry(frame, 5, self._t("field.magnification"), self.barcode_magnification_var.get())
         show_text_var = tk.BooleanVar(value=self.barcode_show_text_var.get())
 
         ctk.CTkCheckBox(frame, text="Print barcode / 2D code", variable=enabled_var).grid(row=0, column=1, sticky="w", padx=10, pady=10)
-        self._dialog_option(frame, 1, "Symbology", type_var, BARCODE_TYPE_LABELS)
-        self._dialog_option(frame, 3, "Position", position_var, BARCODE_POSITION_LABELS)
-        ctk.CTkCheckBox(frame, text="Human-readable text under linear barcodes", variable=show_text_var).grid(row=6, column=1, sticky="w", padx=10, pady=8)
+        self._dialog_option(frame, 1, self._t("field.symbology"), type_var, BARCODE_TYPE_LABELS)
+        self._dialog_option(frame, 3, self._t("field.position"), position_var, _position_labels(self.lang))
+        ctk.CTkCheckBox(frame, text=self._t("field.show_human"), variable=show_text_var).grid(row=6, column=1, sticky="w", padx=10, pady=8)
 
         helper = ctk.CTkFrame(frame, fg_color="transparent")
         helper.grid(row=7, column=1, sticky="ew", padx=10, pady=(2, 8))
         helper.grid_columnconfigure(0, weight=1)
         helper.grid_columnconfigure(1, weight=1)
-        ctk.CTkButton(helper, text="Use first label line", fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, command=lambda: (content_entry.delete(0, "end"), content_entry.insert(0, self._get_text_lines()[0] if self._get_text_lines() else ""))).grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        ctk.CTkButton(helper, text="Use all label text", fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, command=lambda: (content_entry.delete(0, "end"), content_entry.insert(0, " | ".join(line for line in self._get_text_lines() if line.strip())))).grid(row=0, column=1, sticky="ew")
+        ctk.CTkButton(helper, text=self._t("field.use_first_line"), fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, command=lambda: (content_entry.delete(0, "end"), content_entry.insert(0, self._get_text_lines()[0] if self._get_text_lines() else ""))).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ctk.CTkButton(helper, text=self._t("field.use_all_text"), fg_color=COL_SOFT, text_color=COL_TEXT, hover_color=COL_BORDER, command=lambda: (content_entry.delete(0, "end"), content_entry.insert(0, " | ".join(line for line in self._get_text_lines() if line.strip())))).grid(row=0, column=1, sticky="ew")
 
         note = ctk.CTkLabel(
             frame,
@@ -719,8 +828,8 @@ class ZebraApp(ctk.CTk):
         buttons = ctk.CTkFrame(parent, fg_color="transparent")
         buttons.grid(row=row, column=0, columnspan=3, sticky="ew", padx=10, pady=(16, 10))
         buttons.grid_columnconfigure(0, weight=1)
-        ctk.CTkButton(buttons, text="Cancel", fg_color=COL_CARD, hover_color=COL_BORDER, command=cancel_command).grid(row=0, column=1, padx=(0, 8))
-        ctk.CTkButton(buttons, text="Apply", command=apply_command).grid(row=0, column=2)
+        ctk.CTkButton(buttons, text=self._t("action.cancel"), fg_color=COL_SOFT, text_color=COL_TEXT, border_width=1, border_color=COL_BORDER, hover_color=COL_BORDER, command=cancel_command).grid(row=0, column=1, padx=(0, 8))
+        ctk.CTkButton(buttons, text=self._t("action.apply"), command=apply_command).grid(row=0, column=2)
 
     def _open_zpl_window(self, _=None) -> None:
         if self._zpl_window is not None and self._zpl_window.winfo_exists():
@@ -798,7 +907,7 @@ class ZebraApp(ctk.CTk):
         if "barcode_type" in values:
             self.barcode_type_var.set(barcode_label(str(values["barcode_type"] or "code128")))
         if "barcode_pos" in values:
-            self.barcode_pos_var.set("above  (top)" if values["barcode_pos"] == "above" else "below  (bottom)")
+            self.barcode_pos_var.set(_position_label(self.lang, str(values["barcode_pos"])))
         if "barcode_height" in values:
             self.barcode_height_var.set(str(values["barcode_height"]))
         if "barcode_show_text" in values:
@@ -1011,6 +1120,26 @@ class ZebraApp(ctk.CTk):
 
     # ---- actions -------------------------------------------------------------
 
+    def _size_label(self) -> str:
+        try:
+            width = _short_number(float(str(self.width_var.get() or 57).replace(",", ".")))
+            height = _short_number(float(str(self.height_var.get() or 19).replace(",", ".")))
+        except (TypeError, ValueError):
+            return "Custom"
+        label = f"{width} x {height} mm"
+        return label if label in {"57 x 19 mm", "57 x 17 mm", "62 x 29 mm", "100 x 50 mm"} else "Custom"
+
+    def _on_inline_size(self, value: str) -> None:
+        sizes = {"57 x 19 mm": (57, 19), "57 x 17 mm": (57, 17), "62 x 29 mm": (62, 29), "100 x 50 mm": (100, 50)}
+        if value in sizes:
+            self._set_size(*sizes[value])
+        else:
+            self._open_label_setup()
+
+    def _set_barcode_position(self, position: str) -> None:
+        self.barcode_pos_var.set(_position_label(self.lang, position))
+        self._update_all()
+
     def _on_inline_font_size(self, value) -> None:
         size = int(float(value))
         self.font_size_var.set(size)
@@ -1028,6 +1157,8 @@ class ZebraApp(ctk.CTk):
     def _set_size(self, w, h) -> None:
         self.width_var.set(str(w))
         self.height_var.set(str(h))
+        if hasattr(self, "inline_size_var"):
+            self.inline_size_var.set(self._size_label())
         self._update_all()
 
     def _set_alignment(self, alignment: str) -> None:
@@ -1092,7 +1223,6 @@ class ZebraApp(ctk.CTk):
             return
         label = spec.history_label()
         self._status(f"Printed: {label}", COL_SUCCESS)
-        self._add_history(label)
         self._autosave()
 
     def _refresh_printers(self) -> None:
@@ -1157,7 +1287,7 @@ class ZebraApp(ctk.CTk):
         self.border_var.set(imported.border)
         self.barcode_var.set(imported.barcode)
         self.barcode_type_var.set(barcode_label(imported.barcode_type))
-        self.barcode_pos_var.set("above  (top)" if imported.barcode_pos == "above" else "below  (bottom)")
+        self.barcode_pos_var.set(_position_label(self.lang, imported.barcode_pos))
         self.barcode_height_var.set(str(imported.barcode_height))
         self.barcode_show_text_var.set(imported.barcode_show_text)
         self.barcode_magnification_var.set(str(imported.barcode_magnification))
@@ -1260,7 +1390,7 @@ class ZebraApp(ctk.CTk):
         self.barcode_var.set(bool(template.get("barcode", False)))
         self.barcode_text_var.set(str(template.get("barcode_text", "")))
         self.barcode_type_var.set(barcode_label(str(template.get("barcode_type", "code128"))))
-        self.barcode_pos_var.set("above  (top)" if template.get("barcode_pos", "below") == "above" else "below  (bottom)")
+        self.barcode_pos_var.set(_position_label(self.lang, template.get("barcode_pos", "below")))
         self.barcode_height_var.set(str(template.get("barcode_height", 40)))
         self.barcode_show_text_var.set(bool(template.get("barcode_show_text", True)))
         self.barcode_magnification_var.set(str(template.get("barcode_magnification", 4)))
@@ -1283,32 +1413,6 @@ class ZebraApp(ctk.CTk):
             self._refresh_template_dropdown()
             self.template_var.set(self._template_names()[0])
             self._status(f"Template '{name}' deleted", COL_WARN)
-
-    def _add_history(self, label_text: str) -> None:
-        now = datetime.now().strftime("%H:%M")
-        self.settings.setdefault("history", []).insert(0, f"[{now}]  {label_text}")
-        self.settings["history"] = self.settings["history"][:MAX_HISTORY]
-        save_settings(self.settings)
-        self._rebuild_history()
-
-    def _rebuild_history(self) -> None:
-        for widget in self.history_frame.winfo_children():
-            widget.destroy()
-        ctk.CTkLabel(self.history_frame, text="Recent labels", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 2))
-        history = self.settings.get("history", [])
-        if not history:
-            ctk.CTkLabel(self.history_frame, text="No labels printed yet.", font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=1, column=0, sticky="w", padx=10, pady=(0, 8))
-            return
-        for index, entry in enumerate(history[:5], start=1):
-            label = ctk.CTkLabel(self.history_frame, text=entry, font=ctk.CTkFont(size=11), text_color=COL_MUTED, anchor="w", cursor="hand2")
-            label.grid(row=index, column=0, sticky="ew", padx=10, pady=1)
-            text = entry.split("]  ", 1)[1] if "]  " in entry else entry
-            lines = [part.strip() for part in text.replace(" ...", "").split("  |  ")]
-            label.bind("<Button-1>", lambda e, value=lines: self._recall(value))
-
-    def _recall(self, lines: list[str]) -> None:
-        self._set_text_lines(lines)
-        self._update_all()
 
     # ---- status/window lifecycle -------------------------------------------
 

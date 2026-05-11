@@ -50,3 +50,19 @@ The project should stay small and technician-friendly. New features should reduc
 - Template sharing
 - Better preview/rendering options
 - Cross-platform print backends if they can stay cleanly separated from the core
+
+## Language support
+
+Current built-in UI languages: English and German.
+
+More languages are feasible, but they should not be machine-dumped blindly. The code path is simple; the quality risk is translation completeness and wrong technical wording. Good future candidates are French, Spanish, Italian, Dutch, Polish, and Czech because Zebra printers are common in European workshop/warehouse environments.
+
+## Label composition
+
+Next layout improvements:
+
+- visual drag handles for text/code areas,
+- per-area margins,
+- optional fixed QR size in millimetres,
+- better Data Matrix/PDF417 local rendering,
+- reusable user-defined label composition templates.
