@@ -21,7 +21,7 @@ class LabelPreviewCanvas(tk.Canvas):
         cw = max(self.winfo_width(),  PREVIEW_MAX_W)
         ch = max(self.winfo_height(), PREVIEW_MAX_H)
 
-        # Gleiche Positionsberechnung wie ZPL-Generator
+        # Same layout calculation as the ZPL generator
         p = calc_positions(line1, line2, width_mm, height_mm, font_size, dpi,
                            barcode, barcode_text, barcode_pos)
         pw_dots = p["pw"]
@@ -33,39 +33,38 @@ class LabelPreviewCanvas(tk.Canvas):
         ox = (cw - lw) // 2
         oy = (ch - lh) // 2
 
-        # Schatten
+        # Shadow
         self.create_rectangle(ox+4, oy+4, ox+lw+4, oy+lh+4, fill="#0a0a0a", outline="")
 
-        # Etikett-Hintergrund
+        # Label background
         bg_col  = "#141414" if inverted else "#ffffff"
         txt_col = "#ffffff"  if inverted else "#111111"
         self.create_rectangle(ox, oy, ox+lw, oy+lh, fill=bg_col, outline=COL_BORDER, width=1)
 
-        # Rahmen
+        # Border
         if border:
             pad = max(1, int(2 * scale))
             self.create_rectangle(ox+pad, oy+pad, ox+lw-pad, oy+lh-pad,
                                   outline=txt_col, width=max(1, int(2*scale)), fill="")
 
-        # Schriftgroesse als PIXEL (negatives Vorzeichen in tkinter = Pixel, nicht Punkte!)
-        # Das war der Hauptfehler: positive Groesse = Punkte (pt), ca. 1.33x groesser als Pixel
+        # Negative Tkinter font size means pixels, which keeps preview and ZPL dot sizing aligned
         fs_dots = p["fs"]
         fs_px   = max(7, int(fs_dots * scale))
         font    = ("Helvetica", -fs_px, "bold")
 
-        # Positionen in Pixel (identisch skaliert wie ZPL-Dots)
+        # Positions in pixels, scaled from printer dots
         ty_px    = oy + int(p["pos_y_text"] * scale)
         bar_y_px = oy + int(p["pos_y_bar"]  * scale)
         bar_h_px = max(12, int(p["bar_h"]   * scale))
         gap_px   = int(LINE_GAP * scale)
         cx       = ox + lw // 2
 
-        # Zeile 1 - Anker "n" (oben-mitte) = entspricht ZPL ^FO top-left origin
-        l1_text = line1 if line1.strip() else ("Zeile 1 ..." if not line2.strip() else "")
+        # Line 1: top-center anchor matches the ZPL origin model closely enough for preview
+        l1_text = line1 if line1.strip() else ("Line 1 ..." if not line2.strip() else "")
         l1_col  = txt_col if line1.strip() else "#999"
         self.create_text(cx, ty_px, text=l1_text, fill=l1_col, font=font, anchor="n")
 
-        # Zeile 2
+        # Line 2
         if line2.strip():
             self.create_text(cx, ty_px + fs_px + gap_px,
                              text=line2, fill=txt_col, font=font, anchor="n")
@@ -74,7 +73,7 @@ class LabelPreviewCanvas(tk.Canvas):
         if p["has_bar"]:
             self._draw_barcode(ox, bar_y_px, lw, bar_h_px, txt_col, barcode_text, scale)
 
-        # Massangabe
+        # Size info
         self.create_text(ox + lw // 2, oy + lh + 14,
                          text=f"{width_mm} x {height_mm} mm  @{dpi} dpi",
                          fill=COL_MUTED, font=("Helvetica", 9))

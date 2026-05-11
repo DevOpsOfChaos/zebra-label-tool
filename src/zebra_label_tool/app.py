@@ -10,7 +10,6 @@ import customtkinter as ctk
 
 from .constants import (
     APP_TITLE,
-    APP_VERSION,
     COL_ACCENT,
     COL_BORDER,
     COL_CARD,
@@ -22,11 +21,12 @@ from .constants import (
     DPI_OPTIONS,
     MAX_HISTORY,
 )
+from .label_spec import LabelSpec, LabelSpecError
 from .layout import mm_to_dots
 from .preview import LabelPreviewCanvas
 from .printing import get_printers, send_zpl_to_printer
 from .settings import load_settings, save_settings
-from .zpl import generate_zpl
+from .zpl_import import parse_simple_zpl
 
 
 class ZebraApp(ctk.CTk):
@@ -36,12 +36,17 @@ class ZebraApp(ctk.CTk):
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
         self.settings = load_settings()
-        self.title(f"{APP_TITLE}  v{APP_VERSION}")
-        self.geometry("1060x760")
-        self.minsize(860, 620)
-        self.bind("<Escape>",    lambda e: self.destroy())
+        self._closing = False
+        self._status_after_id = None
+        self.title(APP_TITLE)
+        self.geometry("1120x780")
+        self.minsize(920, 640)
+        self.protocol("WM_DELETE_WINDOW", self._safe_close)
+        self.bind("<Escape>",    lambda e: self._safe_close())
         self.bind("<Return>",    lambda e: self._on_print())
         self.bind("<Control-c>", lambda e: self._copy_zpl())
+        self.bind("<Control-s>", lambda e: self._save_all_settings())
+        self.bind("<Control-n>", lambda e: self._reset_label())
         self.bind("<F5>",        lambda e: self._refresh_printers())
         self._build_ui()
         self._load_values()
@@ -67,14 +72,18 @@ class ZebraApp(ctk.CTk):
         hdr = ctk.CTkFrame(left, fg_color="transparent")
         hdr.grid(row=0, column=0, sticky="ew", **p)
         hdr.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(hdr, text="Zebra Label Printer",
-                     font=ctk.CTkFont(size=17, weight="bold")).grid(row=0, column=0, sticky="w")
+        title_block = ctk.CTkFrame(hdr, fg_color="transparent")
+        title_block.grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(title_block, text=APP_TITLE,
+                     font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(title_block, text="Fast local ZPL labels for Zebra-compatible printers",
+                     font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=1, column=0, sticky="w")
         self.status_lbl = ctk.CTkLabel(hdr, text="", font=ctk.CTkFont(size=11), text_color=COL_SUCCESS)
         self.status_lbl.grid(row=0, column=1, sticky="e")
 
         self._div(left, 1)
 
-        # Drucker
+        # Printer
         self._sec(left, 2, "Printer")
         dr = ctk.CTkFrame(left, fg_color="transparent")
         dr.grid(row=3, column=0, sticky="ew", padx=10, pady=2)
@@ -103,7 +112,7 @@ class ZebraApp(ctk.CTk):
 
         self._div(left, 5)
 
-        # Groesse
+        # Size
         self._sec(left, 6, "Label size")
         szf = ctk.CTkFrame(left, fg_color="transparent")
         szf.grid(row=7, column=0, sticky="ew", padx=10, pady=2)
@@ -135,7 +144,7 @@ class ZebraApp(ctk.CTk):
 
         self._div(left, 9)
 
-        # Schrift
+        # Font
         self._sec(left, 10, "Font")
         ff = ctk.CTkFrame(left, fg_color="transparent")
         ff.grid(row=11, column=0, sticky="ew", padx=10, pady=2)
@@ -238,7 +247,7 @@ class ZebraApp(ctk.CTk):
 
         self._div(left, 19)
 
-        # Vorlagen
+        # Templates
         self._sec(left, 20, "Templates")
         vf = ctk.CTkFrame(left, fg_color="transparent")
         vf.grid(row=21, column=0, sticky="ew", padx=10, pady=2)
@@ -257,7 +266,7 @@ class ZebraApp(ctk.CTk):
 
         self._div(left, 22)
 
-        # Drucken
+        # Print
         self.print_btn = ctk.CTkButton(
             left, text="PRINT  [Enter]",
             font=ctk.CTkFont(size=15, weight="bold"),
@@ -269,15 +278,20 @@ class ZebraApp(ctk.CTk):
 
         pf = ctk.CTkFrame(left, fg_color="transparent")
         pf.grid(row=24, column=0, sticky="ew", padx=10, pady=(0, 4))
-        pf.grid_columnconfigure(0, weight=1)
-        ctk.CTkButton(pf, text="Save settings",
-                      height=28, fg_color=COL_CARD, hover_color=COL_BORDER,
+        for column in range(3):
+            pf.grid_columnconfigure(column, weight=1)
+        ctk.CTkButton(pf, text="Save",
+                      height=30, fg_color=COL_CARD, hover_color=COL_BORDER,
                       font=ctk.CTkFont(size=11), command=self._save_all_settings
                       ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ctk.CTkButton(pf, text="New label",
+                      height=30, fg_color=COL_CARD, hover_color=COL_BORDER,
+                      font=ctk.CTkFont(size=11), command=self._reset_label
+                      ).grid(row=0, column=1, sticky="ew", padx=(0, 6))
         ctk.CTkButton(pf, text="Copy ZPL",
-                      height=28, fg_color=COL_CARD, hover_color=COL_BORDER,
+                      height=30, fg_color=COL_CARD, hover_color=COL_BORDER,
                       font=ctk.CTkFont(size=11), command=self._copy_zpl
-                      ).grid(row=0, column=1)
+                      ).grid(row=0, column=2, sticky="ew")
 
         self._div(left, 25)
         self._sec(left, 26, "Recent labels  (click to reuse)")
@@ -289,7 +303,7 @@ class ZebraApp(ctk.CTk):
         self._div(left, 28)
         ctk.CTkLabel(
             left,
-            text="Enter = Print  |  ESC = Exit  |  Ctrl+C = Copy ZPL  |  F5 = Printers",
+            text="Enter = Print  |  ESC = Exit  |  Ctrl+N = New  |  Ctrl+S = Save  |  Ctrl+C = Copy ZPL  |  F5 = Printers",
             font=ctk.CTkFont(size=10), text_color=COL_MUTED
         ).grid(row=29, column=0, pady=(4, 10))
 
@@ -324,10 +338,14 @@ class ZebraApp(ctk.CTk):
                       fg_color=COL_CARD, hover_color=COL_BORDER,
                       font=ctk.CTkFont(size=11), command=self._copy_zpl
                       ).grid(row=0, column=1, sticky="e", padx=(0, 6))
+        ctk.CTkButton(zh, text="Import .zpl", width=104, height=26,
+                      fg_color=COL_CARD, hover_color=COL_BORDER,
+                      font=ctk.CTkFont(size=11), command=self._import_zpl
+                      ).grid(row=0, column=2, sticky="e", padx=(0, 6))
         ctk.CTkButton(zh, text="Export .zpl", width=104, height=26,
                       fg_color=COL_CARD, hover_color=COL_BORDER,
                       font=ctk.CTkFont(size=11), command=self._export_zpl
-                      ).grid(row=0, column=2, sticky="e")
+                      ).grid(row=0, column=3, sticky="e")
 
         self.zpl_box = ctk.CTkTextbox(right, height=190,
                                       font=ctk.CTkFont(family="Courier New", size=11),
@@ -378,7 +396,34 @@ class ZebraApp(ctk.CTk):
         self._on_barcode_toggle()
         self._refresh_template_dropdown()
 
+    def _read_spec(self) -> LabelSpec:
+        return LabelSpec.from_raw(
+            line1=self.line1_entry.get(),
+            line2=self.line2_entry.get(),
+            width_mm=self.width_entry.get() or 57,
+            height_mm=self.height_entry.get() or 19,
+            font_size=int(self.font_size_var.get()),
+            dpi=self._get_dpi(),
+            copies=self.copies_var.get() or 1,
+            inverted=self.inverted_var.get(),
+            border=self.border_var.get(),
+            barcode=self.barcode_var.get(),
+            barcode_text=self.barcode_entry.get(),
+            barcode_pos=self.barcode_pos_var.get(),
+            font_style=self.font_style_var.get(),
+        )
+
+    def _set_zpl_box(self, text: str, error: bool = False) -> None:
+        self.zpl_box.configure(state="normal")
+        self.zpl_box.delete("1.0", "end")
+        self.zpl_box.insert("1.0", text)
+        self.zpl_box.configure(text_color=COL_ERR if error else "#5bc8e8")
+        self.zpl_box.configure(state="disabled")
+
     def _update_all(self, _=None):
+        if self._closing:
+            return
+
         fs = int(self.font_size_var.get())
         self.font_size_lbl.configure(text=str(fs))
 
@@ -387,48 +432,35 @@ class ZebraApp(ctk.CTk):
         self.char_lbl1.configure(text=f"{len(l1)} chars")
         self.char_lbl2.configure(text=f"{len(l2)} chars" if l2 else "")
 
-        zpl = self._build_zpl()
-        self.zpl_box.configure(state="normal")
-        self.zpl_box.delete("1.0", "end")
-        self.zpl_box.insert("1.0", zpl)
-        self.zpl_box.configure(state="disabled")
-
         try:
-            w = int(self.width_entry.get() or 57)
-            h = int(self.height_entry.get() or 19)
-        except ValueError:
-            w, h = 57, 19
+            spec = self._read_spec()
+        except LabelSpecError as exc:
+            self.print_btn.configure(state="disabled")
+            self.preview_info.configure(text=f"Input error: {exc}")
+            self._set_zpl_box(f"-- Invalid input --\n{exc}\n", error=True)
+            return
 
-        dpi = self._get_dpi()
+        self.print_btn.configure(state="normal")
+        self._set_zpl_box(spec.to_zpl())
         self.preview_info.configure(
-            text=f"{mm_to_dots(w, dpi)} x {mm_to_dots(h, dpi)} dots  @{dpi} dpi"
+            text=f"{mm_to_dots(spec.width_mm, spec.dpi)} x {mm_to_dots(spec.height_mm, spec.dpi)} dots  @{spec.dpi} dpi"
         )
-
-        barcode_pos = self.barcode_pos_var.get().split()[0]
         self.preview_canvas.update_preview(
-            line1=l1, line2=l2, width_mm=w, height_mm=h, font_size=fs, dpi=dpi,
-            inverted=self.inverted_var.get(), border=self.border_var.get(),
-            barcode=self.barcode_var.get(), barcode_text=self.barcode_entry.get(),
-            barcode_pos=barcode_pos,
+            line1=spec.line1,
+            line2=spec.line2,
+            width_mm=spec.width_mm,
+            height_mm=spec.height_mm,
+            font_size=spec.font_size,
+            dpi=spec.dpi,
+            inverted=spec.inverted,
+            border=spec.border,
+            barcode=spec.barcode,
+            barcode_text=spec.barcode_text,
+            barcode_pos=spec.barcode_pos,
         )
 
     def _build_zpl(self):
-        try:
-            w  = int(self.width_entry.get()  or 57)
-            h  = int(self.height_entry.get() or 19)
-            fs = int(self.font_size_var.get())
-            cp = max(1, int(self.copies_var.get() or 1))
-        except ValueError:
-            return "-- Invalid input --"
-        style = self.font_style_var.get().split()[0]
-        pos   = self.barcode_pos_var.get().split()[0]
-        return generate_zpl(
-            line1=self.line1_entry.get(), line2=self.line2_entry.get(),
-            width_mm=w, height_mm=h, font_size=fs, dpi=self._get_dpi(),
-            copies=cp, inverted=self.inverted_var.get(), border=self.border_var.get(),
-            barcode=self.barcode_var.get(), barcode_text=self.barcode_entry.get(),
-            barcode_pos=pos, font_style=style,
-        )
+        return self._read_spec().to_zpl()
 
     def _on_barcode_toggle(self):
         state = "normal" if self.barcode_var.get() else "disabled"
@@ -441,30 +473,45 @@ class ZebraApp(ctk.CTk):
         self.line2_entry.delete(0, "end"); self.line2_entry.insert(0, l1)
         self._update_all()
 
+    def _reset_label(self, _=None):
+        self.line1_entry.delete(0, "end")
+        self.line2_entry.delete(0, "end")
+        self.barcode_entry.configure(state="normal")
+        self.barcode_entry.delete(0, "end")
+        if not self.barcode_var.get():
+            self.barcode_entry.configure(state="disabled")
+        self.copies_var.set("1")
+        self.template_var.set(self._template_names()[0])
+        self._update_all()
+        self._status("New label ready", COL_SUCCESS)
+
     def _on_print(self, _=None):
         printer = self.printer_var.get()
         if not printer or printer.startswith("(") or printer.startswith("Error") or printer.startswith("[Test mode"):
-            self._status("No printer selected!", COL_WARN)
+            self._status("No printer selected", COL_WARN)
             messagebox.showwarning("No printer", "Please select a printer.")
             return
-        l1 = self.line1_entry.get().strip()
-        l2 = self.line2_entry.get().strip()
-        if not l1 and not l2:
-            self._status("No text entered!", COL_WARN)
-            messagebox.showwarning("No text", "Please fill at least line 1.")
-            return
-        zpl = self._build_zpl()
         try:
-            send_zpl_to_printer(printer, zpl)
+            spec = self._read_spec()
+        except LabelSpecError as exc:
+            self._status("Invalid input", COL_ERR)
+            messagebox.showwarning("Invalid input", str(exc))
+            return
+        if not spec.has_text:
+            self._status("No text entered", COL_WARN)
+            messagebox.showwarning("No text", "Please fill at least one text line.")
+            return
+        try:
+            send_zpl_to_printer(printer, spec.to_zpl())
         except RuntimeError as e:
-            self._status("Print error!", COL_ERR)
+            self._status("Print error", COL_ERR)
             messagebox.showerror("Print error", str(e))
             return
         except Exception as e:
-            self._status("Error!", COL_ERR)
+            self._status("Error", COL_ERR)
             messagebox.showerror("Error", str(e))
             return
-        label = l1 + (f"  |  {l2}" if l2 else "")
+        label = spec.history_label()
         self._status(f"Printed: {label}", COL_SUCCESS)
         self._add_history(label)
         self._autosave()
@@ -483,10 +530,22 @@ class ZebraApp(ctk.CTk):
         self._update_all()
 
     def _copy_zpl(self, _=None):
-        self.clipboard_clear(); self.clipboard_append(self._build_zpl())
+        try:
+            zpl = self._build_zpl()
+        except LabelSpecError as exc:
+            self._status("Cannot copy invalid ZPL", COL_ERR)
+            messagebox.showwarning("Invalid input", str(exc))
+            return
+        self.clipboard_clear(); self.clipboard_append(zpl)
         self._status("ZPL copied to clipboard", COL_SUCCESS)
 
     def _export_zpl(self):
+        try:
+            zpl = self._build_zpl()
+        except LabelSpecError as exc:
+            self._status("Export blocked", COL_ERR)
+            messagebox.showwarning("Invalid input", str(exc))
+            return
         path = filedialog.asksaveasfilename(
             parent=self,
             title="Export ZPL",
@@ -497,39 +556,82 @@ class ZebraApp(ctk.CTk):
             return
         try:
             with open(path, "w", encoding="utf-8", newline="\n") as f:
-                f.write(self._build_zpl())
+                f.write(zpl)
                 f.write("\n")
         except OSError as exc:
-            self._status("Export failed!", COL_ERR)
+            self._status("Export failed", COL_ERR)
             messagebox.showerror("Export failed", str(exc))
             return
         self._status("ZPL exported", COL_SUCCESS)
+
+    def _import_zpl(self):
+        path = filedialog.askopenfilename(
+            parent=self,
+            title="Import ZPL",
+            filetypes=[("ZPL files", "*.zpl"), ("Text files", "*.txt"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                imported = parse_simple_zpl(f.read(), dpi=self._get_dpi())
+        except OSError as exc:
+            self._status("Import failed", COL_ERR)
+            messagebox.showerror("Import failed", str(exc))
+            return
+
+        self.line1_entry.delete(0, "end"); self.line1_entry.insert(0, imported.line1)
+        self.line2_entry.delete(0, "end"); self.line2_entry.insert(0, imported.line2)
+        if imported.width_mm is not None:
+            self.width_entry.delete(0, "end"); self.width_entry.insert(0, str(imported.width_mm).rstrip("0").rstrip("."))
+        if imported.height_mm is not None:
+            self.height_entry.delete(0, "end"); self.height_entry.insert(0, str(imported.height_mm).rstrip("0").rstrip("."))
+        if imported.font_size is not None:
+            self.font_size_var.set(imported.font_size)
+        self.copies_var.set(str(imported.copies))
+        self.inverted_var.set(imported.inverted)
+        self.border_var.set(imported.border)
+        self.barcode_var.set(imported.barcode)
+        self.barcode_pos_var.set("above  (top)" if imported.barcode_pos == "above" else "below  (bottom)")
+        self.font_style_var.set("A0  (smooth)" if imported.font_style == "A0" else "A  (Bitmap)")
+        self.barcode_entry.configure(state="normal")
+        self.barcode_entry.delete(0, "end"); self.barcode_entry.insert(0, imported.barcode_text)
+        if not imported.barcode:
+            self.barcode_entry.configure(state="disabled")
+        self._update_all()
+        self._status("ZPL imported", COL_SUCCESS)
 
     def _autosave(self):
         self.settings["printer"] = self.printer_var.get()
         save_settings(self.settings)
 
-    def _save_all_settings(self):
+    def _persist_current_settings(self, show_errors: bool = True) -> bool:
         try:
-            w  = int(self.width_entry.get())
-            h  = int(self.height_entry.get())
-            cp = max(1, int(self.copies_var.get() or 1))
-        except ValueError:
-            self._status("Invalid input!", COL_ERR); return
+            spec = self._read_spec()
+        except LabelSpecError as exc:
+            if show_errors:
+                self._status("Invalid input", COL_ERR)
+                messagebox.showwarning("Invalid input", str(exc))
+            return False
         self.settings.update({
             "printer":     self.printer_var.get(),
-            "dpi":         self._get_dpi(),
-            "width_mm":    w, "height_mm": h,
-            "font_size":   int(self.font_size_var.get()),
-            "copies":      cp,
-            "inverted":    self.inverted_var.get(),
-            "border":      self.border_var.get(),
-            "barcode":     self.barcode_var.get(),
-            "barcode_pos": self.barcode_pos_var.get().split()[0],
-            "font_style":  self.font_style_var.get().split()[0],
+            "dpi":         spec.dpi,
+            "width_mm":    spec.width_mm,
+            "height_mm":   spec.height_mm,
+            "font_size":   spec.font_size,
+            "copies":      spec.copies,
+            "inverted":    spec.inverted,
+            "border":      spec.border,
+            "barcode":     spec.barcode,
+            "barcode_pos": spec.barcode_pos,
+            "font_style":  spec.font_style,
         })
         save_settings(self.settings)
-        self._status("Settings saved", COL_SUCCESS)
+        return True
+
+    def _save_all_settings(self, _=None):
+        if self._persist_current_settings(show_errors=True):
+            self._status("Settings saved", COL_SUCCESS)
 
     def _template_names(self):
         names = list(self.settings.get("templates", {}).keys())
@@ -543,20 +645,24 @@ class ZebraApp(ctk.CTk):
         if not name or not name.strip(): return
         name = name.strip()
         try:
-            w = int(self.width_entry.get()); h = int(self.height_entry.get())
-        except ValueError:
-            self._status("Invalid size!", COL_ERR); return
+            spec = self._read_spec()
+        except LabelSpecError as exc:
+            self._status("Invalid input", COL_ERR)
+            messagebox.showwarning("Invalid input", str(exc))
+            return
         self.settings.setdefault("templates", {})[name] = {
-            "width_mm":     w, "height_mm": h,
-            "font_size":    int(self.font_size_var.get()),
-            "font_style":   self.font_style_var.get().split()[0],
-            "dpi":          self._get_dpi(),
-            "line1":        self.line1_entry.get(),
-            "line2":        self.line2_entry.get(),
-            "inverted":     self.inverted_var.get(),
-            "border":       self.border_var.get(),
-            "barcode":      self.barcode_var.get(),
-            "barcode_text": self.barcode_entry.get(),
+            "width_mm":     spec.width_mm,
+            "height_mm":    spec.height_mm,
+            "font_size":    spec.font_size,
+            "font_style":   spec.font_style,
+            "dpi":          spec.dpi,
+            "line1":        spec.line1,
+            "line2":        spec.line2,
+            "inverted":     spec.inverted,
+            "border":       spec.border,
+            "barcode":      spec.barcode,
+            "barcode_text": spec.barcode_text,
+            "barcode_pos":  spec.barcode_pos,
         }
         save_settings(self.settings)
         self._refresh_template_dropdown()
@@ -579,6 +685,7 @@ class ZebraApp(ctk.CTk):
         self.inverted_var.set(t.get("inverted", False))
         self.border_var.set(t.get("border", False))
         self.barcode_var.set(t.get("barcode", False))
+        self.barcode_pos_var.set("above  (top)" if t.get("barcode_pos", "below") == "above" else "below  (bottom)")
         self.barcode_entry.configure(state="normal")
         self.barcode_entry.delete(0, "end"); self.barcode_entry.insert(0, t.get("barcode_text", ""))
         if not t.get("barcode", False): self.barcode_entry.configure(state="disabled")
@@ -630,11 +737,47 @@ class ZebraApp(ctk.CTk):
         self._update_all()
 
     def _status(self, msg, color=COL_SUCCESS):
+        if self._closing:
+            return
         self.status_lbl.configure(text=msg, text_color=color)
-        self.after(5000, lambda: self.status_lbl.configure(text=""))
+        if self._status_after_id is not None:
+            try:
+                self.after_cancel(self._status_after_id)
+            except Exception:
+                pass
+        self._status_after_id = self.after(5000, self._clear_status)
+
+    def _clear_status(self):
+        self._status_after_id = None
+        if not self._closing:
+            self.status_lbl.configure(text="")
+
+    def _safe_close(self):
+        if self._closing:
+            return
+        self._closing = True
+        if self._status_after_id is not None:
+            try:
+                self.after_cancel(self._status_after_id)
+            except Exception:
+                pass
+            self._status_after_id = None
+        try:
+            self._persist_current_settings(show_errors=False)
+        except Exception:
+            pass
+        self.destroy()
 
 
 def run() -> None:
     """Start the desktop application."""
-    app = ZebraApp()
-    app.mainloop()
+    app: ZebraApp | None = None
+    try:
+        app = ZebraApp()
+        app.mainloop()
+    except KeyboardInterrupt:
+        if app is not None:
+            try:
+                app._safe_close()
+            except Exception:
+                pass

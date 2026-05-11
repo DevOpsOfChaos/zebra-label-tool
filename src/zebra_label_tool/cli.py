@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
-from .zpl import generate_zpl
+from .label_spec import LabelSpec, LabelSpecError
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate simple Zebra/ZPL labels.")
     parser.add_argument("line1", help="First label line")
     parser.add_argument("line2", nargs="?", default="", help="Optional second label line")
-    parser.add_argument("--width-mm", type=float, default=57, help="Label width in millimetres")
-    parser.add_argument("--height-mm", type=float, default=19, help="Label height in millimetres")
-    parser.add_argument("--dpi", type=int, default=300, choices=[203, 300, 600], help="Printer DPI")
-    parser.add_argument("--font-size", type=int, default=58, help="ZPL font size in dots")
-    parser.add_argument("--copies", type=int, default=1, help="Number of copies")
+    parser.add_argument("--width-mm", type=str, default="57", help="Label width in millimetres")
+    parser.add_argument("--height-mm", type=str, default="19", help="Label height in millimetres")
+    parser.add_argument("--dpi", type=str, default="300", help="Printer DPI: 203, 300, or 600")
+    parser.add_argument("--font-size", type=str, default="58", help="ZPL font size in dots")
+    parser.add_argument("--copies", type=str, default="1", help="Number of copies")
     parser.add_argument("--inverted", action="store_true", help="Print white-on-black")
     parser.add_argument("--border", action="store_true", help="Draw a border")
     parser.add_argument("--barcode", default="", help="Optional Code128 barcode content")
@@ -25,14 +26,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    print(
-        generate_zpl(
+    try:
+        spec = LabelSpec.from_raw(
             line1=args.line1,
             line2=args.line2,
             width_mm=args.width_mm,
             height_mm=args.height_mm,
-            font_size=args.font_size,
             dpi=args.dpi,
+            font_size=args.font_size,
             copies=args.copies,
             inverted=args.inverted,
             border=args.border,
@@ -40,5 +41,9 @@ def main(argv: list[str] | None = None) -> int:
             barcode_text=args.barcode,
             barcode_pos=args.barcode_pos,
         )
-    )
+    except LabelSpecError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    print(spec.to_zpl())
     return 0
