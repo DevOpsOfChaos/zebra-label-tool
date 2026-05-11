@@ -8,6 +8,7 @@ from tkinter import filedialog, messagebox, simpledialog
 
 import customtkinter as ctk
 
+from .batch import generate_batch_zpl, parse_batch_blocks
 from .constants import (
     APP_TITLE,
     COL_ACCENT,
@@ -22,10 +23,12 @@ from .constants import (
     MAX_HISTORY,
 )
 from .label_spec import LabelSpec, LabelSpecError, MAX_TEXT_LINES
-from .layout import mm_to_dots
+from .layout import calculate_layout_for_lines, mm_to_dots
+from .presets import BUILTIN_PRESET_NAMES, BUILTIN_PRESETS, preset_settings
 from .preview import LabelPreviewCanvas
 from .printing import get_printers, send_zpl_to_printer
 from .settings import load_settings, save_settings
+from .text_tools import normalize_editor_text, transform_lines, wrap_lines
 from .zpl_import import parse_simple_zpl
 
 
@@ -53,6 +56,8 @@ class ZebraApp(ctk.CTk):
         self._status_after_id = None
         self._zpl_window: ctk.CTkToplevel | None = None
         self._zpl_window_box: ctk.CTkTextbox | None = None
+        self._batch_window: ctk.CTkToplevel | None = None
+        self._batch_text_box: ctk.CTkTextbox | None = None
 
         self.title(APP_TITLE)
         self.geometry("1120x760")
@@ -74,6 +79,7 @@ class ZebraApp(ctk.CTk):
         self.bind("<Control-t>", lambda e: self._open_text_options())
         self.bind("<Control-b>", lambda e: self._open_barcode_options())
         self.bind("<Control-z>", lambda e: self._open_zpl_window())
+        self.bind("<Control-Shift-B>", lambda e: self._open_batch_window())
         self.bind("<F5>", lambda e: self._refresh_printers())
 
     def _build_menu(self) -> None:
@@ -103,10 +109,23 @@ class ZebraApp(ctk.CTk):
         label_menu.add_separator()
         for label, width, height in [("57 x 19 mm", 57, 19), ("57 x 17 mm", 57, 17), ("62 x 29 mm", 62, 29), ("100 x 50 mm", 100, 50)]:
             label_menu.add_command(label=label, command=lambda w=width, h=height: self._set_size(w, h))
+        label_menu.add_separator()
+        preset_menu = tk.Menu(label_menu, tearoff=False)
+        for preset in BUILTIN_PRESETS:
+            preset_menu.add_command(label=preset.name, command=lambda name=preset.name: self._apply_builtin_preset(name))
+        label_menu.add_cascade(label="Apply built-in preset", menu=preset_menu)
         menubar.add_cascade(label="Label", menu=label_menu)
 
         text_menu = tk.Menu(menubar, tearoff=False)
         text_menu.add_command(label="Text options...", accelerator="Ctrl+T", command=self._open_text_options)
+        text_menu.add_separator()
+        text_menu.add_command(label="Clean up whitespace", command=lambda: self._format_text("cleanup"))
+        text_menu.add_command(label="Remove empty lines", command=lambda: self._format_text("remove_empty"))
+        text_menu.add_command(label="Wrap long lines...", command=self._wrap_text_dialog)
+        text_menu.add_separator()
+        text_menu.add_command(label="UPPERCASE", command=lambda: self._format_text("uppercase"))
+        text_menu.add_command(label="lowercase", command=lambda: self._format_text("lowercase"))
+        text_menu.add_command(label="Title Case", command=lambda: self._format_text("title_case"))
         text_menu.add_separator()
         for alignment in ALIGNMENT_LABELS:
             text_menu.add_command(label=f"Align {alignment}", command=lambda a=alignment: self._set_alignment(a))
@@ -116,6 +135,12 @@ class ZebraApp(ctk.CTk):
         barcode_menu.add_command(label="Barcode options...", accelerator="Ctrl+B", command=self._open_barcode_options)
         barcode_menu.add_command(label="Toggle barcode", command=self._toggle_barcode)
         menubar.add_cascade(label="Barcode", menu=barcode_menu)
+
+        tools_menu = tk.Menu(menubar, tearoff=False)
+        tools_menu.add_command(label="Batch labels...", accelerator="Ctrl+Shift+B", command=self._open_batch_window)
+        tools_menu.add_separator()
+        tools_menu.add_command(label="Reset layout options", command=self._reset_layout_options)
+        menubar.add_cascade(label="Tools", menu=tools_menu)
 
         view_menu = tk.Menu(menubar, tearoff=False)
         view_menu.add_command(label="Show ZPL...", accelerator="Ctrl+Z", command=self._open_zpl_window)
@@ -139,7 +164,7 @@ class ZebraApp(ctk.CTk):
         left = ctk.CTkFrame(self, width=430, fg_color=COL_PANEL)
         left.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
         left.grid_columnconfigure(0, weight=1)
-        left.grid_rowconfigure(3, weight=1)
+        left.grid_rowconfigure(4, weight=1)
 
         header = ctk.CTkFrame(left, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 8))
@@ -193,8 +218,16 @@ class ZebraApp(ctk.CTk):
         ctk.CTkButton(actions, text="New", height=42, fg_color=COL_CARD, hover_color=COL_BORDER, command=self._reset_label).grid(row=0, column=1, sticky="ew", padx=(0, 6))
         ctk.CTkButton(actions, text="ZPL...", height=42, fg_color=COL_CARD, hover_color=COL_BORDER, command=self._open_zpl_window).grid(row=0, column=2, sticky="ew")
 
+        preset_bar = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=10)
+        preset_bar.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 8))
+        preset_bar.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(preset_bar, text="Preset", font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=0, column=0, padx=(10, 6), pady=8)
+        self.quick_preset_var = tk.StringVar(value=BUILTIN_PRESET_NAMES[0])
+        ctk.CTkOptionMenu(preset_bar, variable=self.quick_preset_var, values=list(BUILTIN_PRESET_NAMES), height=30).grid(row=0, column=1, sticky="ew", pady=8)
+        ctk.CTkButton(preset_bar, text="Apply", width=72, height=30, fg_color=COL_PANEL, hover_color=COL_BORDER, command=lambda: self._apply_builtin_preset(self.quick_preset_var.get())).grid(row=0, column=2, padx=10, pady=8)
+
         text_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=10)
-        text_card.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 8))
+        text_card.grid(row=4, column=0, sticky="nsew", padx=12, pady=(0, 8))
         text_card.grid_columnconfigure(0, weight=1)
         text_card.grid_rowconfigure(2, weight=1)
         text_header = ctk.CTkFrame(text_card, fg_color="transparent")
@@ -230,14 +263,16 @@ class ZebraApp(ctk.CTk):
         ctk.CTkButton(text_tools, text="Clear", height=28, fg_color=COL_PANEL, hover_color="#5c1010", font=ctk.CTkFont(size=11), command=self._clear_text).grid(row=0, column=3, sticky="ew")
 
         summary = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=10)
-        summary.grid(row=4, column=0, sticky="ew", padx=12, pady=(0, 8))
+        summary.grid(row=5, column=0, sticky="ew", padx=12, pady=(0, 8))
         summary.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(summary, text="Current setup", font=ctk.CTkFont(size=12, weight="bold")).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 0))
         self.setup_summary_lbl = ctk.CTkLabel(summary, text="", justify="left", anchor="w", font=ctk.CTkFont(size=11), text_color=COL_MUTED)
-        self.setup_summary_lbl.grid(row=1, column=0, sticky="ew", padx=10, pady=(2, 8))
+        self.setup_summary_lbl.grid(row=1, column=0, sticky="ew", padx=10, pady=(2, 2))
+        self.quality_lbl = ctk.CTkLabel(summary, text="", justify="left", anchor="w", font=ctk.CTkFont(size=11), text_color=COL_MUTED)
+        self.quality_lbl.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 8))
 
         lower = ctk.CTkFrame(left, fg_color="transparent")
-        lower.grid(row=5, column=0, sticky="ew", padx=12, pady=(0, 8))
+        lower.grid(row=6, column=0, sticky="ew", padx=12, pady=(0, 8))
         lower.grid_columnconfigure(0, weight=1)
         self.template_var = tk.StringVar(value="- choose template -")
         self.template_dd = ctk.CTkOptionMenu(lower, variable=self.template_var, values=self._template_names(), height=30, command=self._load_template)
@@ -246,7 +281,7 @@ class ZebraApp(ctk.CTk):
         ctk.CTkButton(lower, text="Delete", width=70, height=30, fg_color=COL_CARD, hover_color="#5c1010", command=self._delete_template).grid(row=0, column=2)
 
         self.history_frame = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=10)
-        self.history_frame.grid(row=6, column=0, sticky="ew", padx=12, pady=(0, 10))
+        self.history_frame.grid(row=7, column=0, sticky="ew", padx=12, pady=(0, 10))
         self.history_frame.grid_columnconfigure(0, weight=1)
         self._rebuild_history()
 
@@ -366,6 +401,8 @@ class ZebraApp(ctk.CTk):
             self.preview_info.configure(text=f"Input error: {exc}")
             self.text_counter_lbl.configure(text="invalid")
             self.setup_summary_lbl.configure(text=f"Invalid input: {exc}")
+            if hasattr(self, "quality_lbl"):
+                self.quality_lbl.configure(text="Fix the highlighted input before printing.", text_color=COL_ERR)
             self._refresh_zpl_window(f"-- Invalid input --\n{exc}\n", error=True)
             return
 
@@ -383,6 +420,7 @@ class ZebraApp(ctk.CTk):
                 f"barcode {'on' if spec.active_barcode else 'off'}"
             )
         )
+        self._update_quality_warning(spec)
         self.preview_canvas.update_preview(
             lines=spec.text_lines,
             width_mm=spec.width_mm,
@@ -405,6 +443,35 @@ class ZebraApp(ctk.CTk):
 
     def _build_zpl(self) -> str:
         return self._read_spec().to_zpl()
+
+    def _update_quality_warning(self, spec: LabelSpec) -> None:
+        layout = calculate_layout_for_lines(
+            spec.text_lines,
+            width_mm=spec.width_mm,
+            height_mm=spec.height_mm,
+            font_size=spec.font_size,
+            dpi=spec.dpi,
+            barcode=spec.barcode,
+            barcode_text=spec.barcode_text,
+            barcode_pos=spec.barcode_pos,
+            line_gap=spec.line_gap,
+            offset_x=spec.offset_x,
+            offset_y=spec.offset_y,
+            auto_fit=spec.auto_fit,
+        )
+        warnings: list[str] = []
+        if spec.auto_fit and layout.fs < spec.font_size:
+            warnings.append(f"Auto-fit reduced font to {layout.fs} dots")
+        if not spec.has_text:
+            warnings.append("Enter at least one text line before printing")
+        if spec.active_barcode and len(spec.barcode_text.strip()) > 32:
+            warnings.append("Long barcode text may become hard to scan")
+        if len(spec.text_lines) >= MAX_TEXT_LINES:
+            warnings.append(f"Maximum of {MAX_TEXT_LINES} lines reached")
+        if warnings:
+            self.quality_lbl.configure(text="Warning: " + " | ".join(warnings), text_color=COL_WARN)
+        else:
+            self.quality_lbl.configure(text="Ready: preview and generated ZPL share the same layout calculation.", text_color=COL_MUTED)
 
     # ---- dialogs -------------------------------------------------------------
 
@@ -577,6 +644,199 @@ class ZebraApp(ctk.CTk):
         self._zpl_window_box.insert("1.0", text)
         self._zpl_window_box.configure(text_color=COL_ERR if error else "#5bc8e8")
         self._zpl_window_box.configure(state="disabled")
+
+    def _apply_setting_values(self, values: dict[str, object]) -> None:
+        if "width_mm" in values:
+            self.width_var.set(_short_number(values["width_mm"]))
+        if "height_mm" in values:
+            self.height_var.set(_short_number(values["height_mm"]))
+        if "copies" in values:
+            self.copies_var.set(str(values["copies"]))
+        if "font_size" in values:
+            self.font_size_var.set(int(values["font_size"]))
+        if "dpi" in values:
+            saved_dpi = int(values["dpi"])
+            self.dpi_var.set(next((k for k, v in DPI_OPTIONS.items() if v == saved_dpi), list(DPI_OPTIONS.keys())[1]))
+        if "font_style" in values:
+            self.font_style_var.set("A0  (smooth)" if values["font_style"] == "A0" else "A  (Bitmap)")
+        if "text_lines" in values:
+            self._set_text_lines([str(line) for line in values.get("text_lines", [""])])
+        elif "line1" in values or "line2" in values:
+            self._set_text_lines([str(values.get("line1", "")), str(values.get("line2", ""))])
+        if "inverted" in values:
+            self.inverted_var.set(bool(values["inverted"]))
+        if "border" in values:
+            self.border_var.set(bool(values["border"]))
+        if "barcode" in values:
+            self.barcode_var.set(bool(values["barcode"]))
+        if "barcode_text" in values:
+            self.barcode_text_var.set(str(values["barcode_text"] or ""))
+        if "barcode_pos" in values:
+            self.barcode_pos_var.set("above  (top)" if values["barcode_pos"] == "above" else "below  (bottom)")
+        if "alignment" in values:
+            self.alignment_var.set(str(values["alignment"] or "center"))
+        if "rotation" in values:
+            self.rotation_var.set(str(values["rotation"] or "normal"))
+        if "line_gap" in values:
+            self.line_gap_var.set(str(values["line_gap"]))
+        if "offset_x" in values:
+            self.offset_x_var.set(str(values["offset_x"]))
+        if "offset_y" in values:
+            self.offset_y_var.set(str(values["offset_y"]))
+        if "auto_fit" in values:
+            self.auto_fit_var.set(bool(values["auto_fit"]))
+        self._update_all()
+
+    def _apply_builtin_preset(self, name: str) -> None:
+        try:
+            values = preset_settings(name)
+        except KeyError:
+            self._status("Unknown preset", COL_ERR)
+            return
+        self._apply_setting_values(values)
+        if hasattr(self, "quick_preset_var") and name in BUILTIN_PRESET_NAMES:
+            self.quick_preset_var.set(name)
+        self._status(f"Preset applied: {name}", COL_SUCCESS)
+
+    def _format_text(self, action: str) -> None:
+        current = self._get_text_lines()
+        if action == "cleanup":
+            lines = normalize_editor_text("\n".join(current), remove_empty=False, collapse_spaces=True)
+        else:
+            try:
+                lines = transform_lines(current, action)
+            except ValueError as exc:
+                self._status(str(exc), COL_ERR)
+                return
+        self._set_text_lines(list(lines[:MAX_TEXT_LINES]))
+        self._update_all()
+        self._status("Text updated", COL_SUCCESS)
+
+    def _wrap_text_dialog(self) -> None:
+        value = simpledialog.askinteger("Wrap long lines", "Maximum characters per printed line:", parent=self, initialvalue=28, minvalue=4, maxvalue=80)
+        if value is None:
+            return
+        try:
+            lines = wrap_lines(self._get_text_lines(), value, max_lines=MAX_TEXT_LINES)
+        except ValueError as exc:
+            self._status(str(exc), COL_ERR)
+            messagebox.showwarning("Invalid wrap width", str(exc), parent=self)
+            return
+        self._set_text_lines(list(lines))
+        self._update_all()
+        self._status("Text wrapped", COL_SUCCESS)
+
+    def _reset_layout_options(self) -> None:
+        self.font_size_var.set(58)
+        self.font_style_var.set("A0  (smooth)")
+        self.alignment_var.set("center")
+        self.rotation_var.set("normal")
+        self.line_gap_var.set("10")
+        self.offset_x_var.set("0")
+        self.offset_y_var.set("0")
+        self.auto_fit_var.set(True)
+        self.inverted_var.set(False)
+        self.border_var.set(False)
+        self._update_all()
+        self._status("Layout options reset", COL_SUCCESS)
+
+    def _open_batch_window(self, _=None) -> None:
+        if self._batch_window is not None and self._batch_window.winfo_exists():
+            self._batch_window.focus()
+            return
+        win = ctk.CTkToplevel(self)
+        win.title("Batch labels")
+        win.geometry("740x560")
+        win.grid_columnconfigure(0, weight=1)
+        win.grid_rowconfigure(2, weight=1)
+        win.protocol("WM_DELETE_WINDOW", self._close_batch_window)
+        self._batch_window = win
+
+        header = ctk.CTkFrame(win, fg_color="transparent")
+        header.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 4))
+        header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(header, text="Batch labels", font=ctk.CTkFont(size=15, weight="bold")).grid(row=0, column=0, sticky="w")
+        self.batch_barcode_from_first_var = tk.BooleanVar(value=self.barcode_var.get())
+        ctk.CTkCheckBox(header, text="Use first line as barcode", variable=self.batch_barcode_from_first_var).grid(row=0, column=1, padx=(8, 0))
+
+        hint = ctk.CTkLabel(
+            win,
+            text="Enter one or more labels. Blank lines separate labels; lines inside a block stay on the same label.",
+            font=ctk.CTkFont(size=11),
+            text_color=COL_MUTED,
+        )
+        hint.grid(row=1, column=0, sticky="w", padx=12, pady=(0, 6))
+
+        self._batch_text_box = ctk.CTkTextbox(win, font=ctk.CTkFont(size=15), fg_color="#18181b", wrap="none")
+        self._batch_text_box.grid(row=2, column=0, sticky="nsew", padx=12, pady=(0, 8))
+        current = "\n".join(line for line in self._get_text_lines() if line.strip())
+        example = current or "ASSET-001\nRack A\n\nASSET-002\nRack B\n\nASSET-003\nRack C"
+        self._batch_text_box.insert("1.0", example)
+
+        footer = ctk.CTkFrame(win, fg_color="transparent")
+        footer.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 12))
+        footer.grid_columnconfigure(0, weight=1)
+        self.batch_info_lbl = ctk.CTkLabel(footer, text="", font=ctk.CTkFont(size=11), text_color=COL_MUTED)
+        self.batch_info_lbl.grid(row=0, column=0, sticky="w")
+        ctk.CTkButton(footer, text="Copy batch ZPL", command=self._copy_batch_zpl).grid(row=0, column=1, padx=(0, 6))
+        ctk.CTkButton(footer, text="Export .zpl", fg_color=COL_CARD, hover_color=COL_BORDER, command=self._export_batch_zpl).grid(row=0, column=2, padx=(0, 6))
+        ctk.CTkButton(footer, text="Close", fg_color=COL_CARD, hover_color=COL_BORDER, command=self._close_batch_window).grid(row=0, column=3)
+        self._batch_text_box.bind("<KeyRelease>", lambda _: self._update_batch_info())
+        self._update_batch_info()
+
+    def _close_batch_window(self) -> None:
+        if self._batch_window is not None:
+            self._batch_window.destroy()
+        self._batch_window = None
+        self._batch_text_box = None
+
+    def _batch_blocks(self) -> tuple[tuple[str, ...], ...]:
+        if self._batch_text_box is None:
+            return ()
+        return parse_batch_blocks(self._batch_text_box.get("1.0", "end-1c"))
+
+    def _update_batch_info(self) -> None:
+        if not hasattr(self, "batch_info_lbl"):
+            return
+        count = len(self._batch_blocks())
+        self.batch_info_lbl.configure(text=f"{count} label{'s' if count != 1 else ''} ready")
+
+    def _batch_zpl(self) -> str:
+        blocks = self._batch_blocks()
+        if not blocks:
+            raise LabelSpecError("Batch text does not contain any labels")
+        return generate_batch_zpl(self._read_spec(), blocks, barcode_from_first_line=self.batch_barcode_from_first_var.get())
+
+    def _copy_batch_zpl(self) -> None:
+        try:
+            zpl = self._batch_zpl()
+        except LabelSpecError as exc:
+            self._status("Batch blocked", COL_ERR)
+            messagebox.showwarning("Batch blocked", str(exc), parent=self._batch_window or self)
+            return
+        self.clipboard_clear()
+        self.clipboard_append(zpl)
+        self._status("Batch ZPL copied", COL_SUCCESS)
+
+    def _export_batch_zpl(self) -> None:
+        try:
+            zpl = self._batch_zpl()
+        except LabelSpecError as exc:
+            self._status("Batch export blocked", COL_ERR)
+            messagebox.showwarning("Batch blocked", str(exc), parent=self._batch_window or self)
+            return
+        path = filedialog.asksaveasfilename(parent=self._batch_window or self, title="Export batch ZPL", defaultextension=".zpl", filetypes=[("ZPL files", "*.zpl"), ("Text files", "*.txt"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8", newline="\n") as file:
+                file.write(zpl)
+                file.write("\n")
+        except OSError as exc:
+            self._status("Batch export failed", COL_ERR)
+            messagebox.showerror("Batch export failed", str(exc), parent=self._batch_window or self)
+            return
+        self._status("Batch ZPL exported", COL_SUCCESS)
 
     # ---- actions -------------------------------------------------------------
 
@@ -888,6 +1148,11 @@ class ZebraApp(ctk.CTk):
         try:
             if self._zpl_window is not None and self._zpl_window.winfo_exists():
                 self._zpl_window.destroy()
+        except Exception:
+            pass
+        try:
+            if self._batch_window is not None and self._batch_window.winfo_exists():
+                self._batch_window.destroy()
         except Exception:
             pass
         self.destroy()

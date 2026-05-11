@@ -33,11 +33,15 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Direct RAW printing to installed Windows printers
 - Common DPI presets: 203, 300, 600
 - Common label size shortcuts
+- Built-in presets for device labels, asset tags, storage bins, and cable markers
 - Font size, font style, alignment, rotation, line gap, offset, and auto-fit controls
 - Optional inverted label output
 - Optional border
 - Optional Code128 barcode
-- Top menu workflow for Label, Text, Barcode, and ZPL tools
+- Top menu workflow for Label, Text, Barcode, ZPL, text cleanup, and batch tools
+- Text cleanup actions: trim whitespace, remove empty lines, uppercase, lowercase, title case, and wrap long lines
+- Batch label ZPL generation from pasted text blocks
+- Layout quality warnings for auto-fit, empty labels, long barcodes, and line limits
 - Templates
 - Print history
 - Safer input validation before print/copy/export
@@ -107,6 +111,7 @@ zebra-label-tool-gui
 | `Ctrl+T` | Open text options |
 | `Ctrl+B` | Open barcode options |
 | `Ctrl+Z` | Show generated ZPL window |
+| `Ctrl+Shift+B` | Open batch labels window |
 | `F5` | Refresh printer list |
 
 ### Generate ZPL from the command line
@@ -132,9 +137,12 @@ python -m zebra_label_tool "Motor" "230 V" --alignment left --rotation normal --
 ```text
 src/zebra_label_tool/
   app.py        # CustomTkinter desktop app
+  batch.py      # batch label ZPL helpers
   cli.py        # command line ZPL generation
   layout.py     # pure label geometry/layout calculations
   preview.py    # canvas preview
+  presets.py    # built-in workflow presets
+  text_tools.py # editor cleanup/wrapping helpers
   label_spec.py # shared validated label request model
   printing.py   # Windows RAW printing backend
   settings.py   # per-user settings persistence
@@ -160,16 +168,15 @@ Near-term:
 - Add real screenshots
 - Add packaged Windows release build
 - Add QR code support
-- Improve validation and user-facing error messages
-- Add a few real-world label template examples
-- Improve visual polish of the desktop UI
+- Add network printer backend for TCP port 9100
+- Improve visual polish after real Windows review
+- Add batch preview and CSV import
 
 Later:
 
-- Network printer backend for TCP port 9100
-- CSV batch printing
 - More barcode types
 - Template sharing
+- Template variables
 - Better preview/rendering options
 
 ## Contributing
