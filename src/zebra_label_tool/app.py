@@ -104,14 +104,12 @@ class ZebraApp(ctk.CTk):
 
     def _bind_shortcuts(self) -> None:
         self.bind("<Escape>", lambda e: self._safe_close())
-        self.bind("<Return>", lambda e: self._on_print())
-        self.bind("<Control-c>", lambda e: self._copy_zpl())
+        self.bind("<Control-p>", lambda e: self._on_print())
         self.bind("<Control-s>", lambda e: self._save_all_settings())
         self.bind("<Control-n>", lambda e: self._reset_label())
         self.bind("<Control-l>", lambda e: self._open_label_setup())
         self.bind("<Control-t>", lambda e: self._open_text_options())
         self.bind("<Control-b>", lambda e: self._open_barcode_options())
-        self.bind("<Control-z>", lambda e: self._open_zpl_window())
         self.bind("<Control-Shift-B>", lambda e: self._open_batch_window())
         self.bind("<F5>", lambda e: self._refresh_printers())
 
@@ -123,9 +121,9 @@ class ZebraApp(ctk.CTk):
         file_menu.add_separator()
         file_menu.add_command(label="Import ZPL...", command=self._import_zpl)
         file_menu.add_command(label="Export ZPL...", command=self._export_zpl)
-        file_menu.add_command(label="Copy ZPL", accelerator="Ctrl+C", command=self._copy_zpl)
+        file_menu.add_command(label="Copy ZPL", command=self._copy_zpl)
         file_menu.add_separator()
-        file_menu.add_command(label="Print", accelerator="Enter", command=self._on_print)
+        file_menu.add_command(label="Print", accelerator="Ctrl+P", command=self._on_print)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", accelerator="Esc", command=self._safe_close)
         menubar.add_cascade(label="File", menu=file_menu)
@@ -184,11 +182,14 @@ class ZebraApp(ctk.CTk):
         menubar.add_cascade(label="Tools", menu=tools_menu)
 
         view_menu = tk.Menu(menubar, tearoff=False)
-        view_menu.add_command(label="Show ZPL...", accelerator="Ctrl+Z", command=self._open_zpl_window)
+        view_menu.add_command(label="Show ZPL...", command=self._open_zpl_window)
         view_menu.add_command(label="Refresh preview", accelerator="F5", command=self._update_all)
         menubar.add_cascade(label="View", menu=view_menu)
 
         help_menu = tk.Menu(menubar, tearoff=False)
+        help_menu.add_command(label="Quick guide", command=self._show_quick_guide)
+        help_menu.add_command(label="Keyboard shortcuts", command=self._show_shortcuts)
+        help_menu.add_separator()
         help_menu.add_command(label="About", command=self._show_about)
         menubar.add_cascade(label="Help", menu=help_menu)
 
@@ -248,7 +249,7 @@ class ZebraApp(ctk.CTk):
         actions.grid_columnconfigure(1, weight=1)
         self.print_btn = ctk.CTkButton(
             actions,
-            text="PRINT",
+            text="Print label",
             height=42,
             font=ctk.CTkFont(size=14, weight="bold"),
             fg_color=COL_ACCENT,
@@ -315,7 +316,7 @@ class ZebraApp(ctk.CTk):
 
         ctk.CTkLabel(
             text_card,
-            text=f"One printed line per row. Up to {MAX_TEXT_LINES} rows. Label and barcode setup live in the top menu.",
+            text=f"Enter adds a printed line. Use Ctrl+P or the Print label button to print. Up to {MAX_TEXT_LINES} lines.",
             font=ctk.CTkFont(size=10),
             text_color=COL_MUTED,
         ).grid(row=3, column=0, sticky="w", padx=10)
@@ -331,6 +332,7 @@ class ZebraApp(ctk.CTk):
             activate_scrollbars=True,
         )
         self.text_box.grid(row=4, column=0, sticky="nsew", padx=10, pady=(6, 10))
+        self.text_box.bind("<Return>", self._text_box_return)
         self.text_box.bind("<KeyRelease>", lambda _: self._update_all())
 
         lower = ctk.CTkFrame(left, fg_color="transparent")
@@ -381,7 +383,7 @@ class ZebraApp(ctk.CTk):
         footer.grid_columnconfigure(0, weight=1)
         self.preview_hint = ctk.CTkLabel(
             footer,
-            text="Label, barcode/QR and ZPL tools are in the top menu to keep the main view clean.",
+            text="Tip: Enter creates another label line. Advanced label, barcode/QR and ZPL tools are in the top menu.",
             font=ctk.CTkFont(size=11),
             text_color=COL_MUTED,
         )
@@ -402,6 +404,15 @@ class ZebraApp(ctk.CTk):
     def _set_text_lines(self, lines: list[str] | tuple[str, ...]) -> None:
         self.text_box.delete("1.0", "end")
         self.text_box.insert("1.0", "\n".join(lines))
+
+    def _text_box_return(self, _event=None):
+        """Keep Enter inside the editor as a normal line break.
+
+        The application intentionally does not bind Enter to printing. A label
+        editor must allow fast multi-line entry without the risk of printing by
+        accident.
+        """
+        return None
 
     def _set_entry(self, entry: ctk.CTkEntry, value: str | int | float) -> None:
         entry.delete(0, "end")
@@ -548,7 +559,7 @@ class ZebraApp(ctk.CTk):
         if spec.auto_fit and layout.fs < spec.font_size:
             warnings.append(f"Auto-fit reduced font to {layout.fs} dots")
         if not spec.has_text:
-            warnings.append("Enter at least one text line before printing")
+            warnings.append("Type label text first; Enter adds another printed line")
         if spec.active_barcode and len(spec.barcode_text.strip()) > 32:
             warnings.append("Long barcode text may become hard to scan")
         if len(spec.text_lines) >= MAX_TEXT_LINES:
@@ -1268,6 +1279,35 @@ class ZebraApp(ctk.CTk):
         self._status_after_id = None
         if not self._closing:
             self.status_lbl.configure(text="")
+
+    def _show_quick_guide(self) -> None:
+        messagebox.showinfo(
+            "Quick guide",
+            "1. Select a printer on the left.\n"
+            "2. Type one or more label lines. Press Enter for another printed line.\n"
+            "3. Tune font, alignment and auto-fit in the main view.\n"
+            "4. Use Label and Barcode / QR menus for advanced setup.\n"
+            "5. Use View > Show ZPL when you need copy/export/import tools.\n"
+            "6. Print with the Print label button or Ctrl+P. Enter never prints.",
+            parent=self,
+        )
+
+    def _show_shortcuts(self) -> None:
+        messagebox.showinfo(
+            "Keyboard shortcuts",
+            "Enter: add a new line in the label text editor\n"
+            "Ctrl+P: print current label\n"
+            "Esc: close the app\n"
+            "Ctrl+N: start a new label\n"
+            "Ctrl+S: save current settings\n"
+            "Ctrl+L: label setup\n"
+            "Ctrl+T: text options\n"
+            "Ctrl+B: barcode / QR options\n"
+            "Ctrl+Shift+B: batch labels\n"
+            "F5: refresh printer list\n\n"
+            "Ctrl+C and Ctrl+Z are intentionally left to normal text editing behavior.",
+            parent=self,
+        )
 
     def _show_about(self) -> None:
         messagebox.showinfo(

@@ -4,6 +4,7 @@
 
 ### Added
 
+- Help menu entries for a quick guide and keyboard shortcut reference.
 - Barcode and 2D-code support for Code 128, Code 39, EAN-13, UPC-A, QR Code, Data Matrix, and PDF417.
 - Shared barcode metadata and payload validation in `barcodes.py`.
 - CLI options for barcode type, barcode height, hidden human-readable text, and QR/Data Matrix magnification.
@@ -17,6 +18,9 @@
 
 ### Changed
 
+- Enter now stays inside the multi-line editor and creates another printed label line instead of printing.
+- Printing moved to `Ctrl+P` and the **Print label** button to avoid accidental output.
+- `Ctrl+C` and `Ctrl+Z` are no longer app-level ZPL shortcuts, so normal text copy/undo behavior is preserved.
 - The main GUI now uses a cleaner light layout because native Tk menu bars cannot be reliably themed like CustomTkinter content on every platform.
 - Font size, alignment, and auto-fit moved into the main text area; label setup and barcode setup moved out of the main panel.
 - Current setup moved to the bottom of the preview side so it no longer competes with label text entry.
@@ -25,4 +29,5 @@
 
 ### Fixed
 
+- Fixed an accidental duplicate widget argument in the main action row.
 - The changelog content is now a real changelog instead of duplicating roadmap text.

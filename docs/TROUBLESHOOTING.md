@@ -50,3 +50,11 @@ For tests or temporary runs, set:
 ```powershell
 $env:ZEBRA_LABEL_TOOL_SETTINGS = "$PWD\temp-settings.json"
 ```
+
+## Pressing Enter does not print
+
+This is intentional. The main editor is multi-line, so Enter creates another printed text line. Use the **Print label** button or `Ctrl+P` to print. This prevents accidental label output while typing.
+
+## Copy and undo shortcuts inside the text editor
+
+`Ctrl+C` and `Ctrl+Z` are left to normal text editing behavior. Generated ZPL can still be copied from **View > Show ZPL...**.

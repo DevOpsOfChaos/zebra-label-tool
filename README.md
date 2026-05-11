@@ -12,9 +12,10 @@ Zebra Label Tool focuses on a small workflow:
 
 1. choose label size and DPI,
 2. enter the label text as one or more rows,
-3. tune advanced label/text/barcode options from the top menu,
-4. preview the result,
-5. print, export, import, or copy the generated ZPL when needed.
+3. press Enter inside the editor when the label needs another printed line,
+4. tune advanced label/text/barcode options from the top menu,
+5. preview the result,
+6. print with the button or `Ctrl+P`, and open ZPL tools only when needed.
 
 ## Current status
 
@@ -35,6 +36,7 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Common label size shortcuts
 - Built-in presets for device labels, asset tags, QR device links, storage bins, and cable markers
 - Main-window text controls for font size, alignment, and auto-fit
+- Enter in the text editor adds another printed line instead of printing accidentally
 - Advanced font style, rotation, line gap, and offset controls
 - Optional inverted label output
 - Optional border
@@ -105,15 +107,14 @@ zebra-label-tool-gui
 
 | Shortcut | Action |
 |---|---|
-| `Enter` | Print current label |
+| `Enter` | Add another printed text line in the editor |
+| `Ctrl+P` | Print current label |
 | `Esc` | Close the app |
 | `Ctrl+N` | Clear text/barcode for a new label |
 | `Ctrl+S` | Save current settings |
-| `Ctrl+C` | Copy generated ZPL |
 | `Ctrl+L` | Open label setup |
 | `Ctrl+T` | Open text options |
-| `Ctrl+B` | Open barcode options |
-| `Ctrl+Z` | Show generated ZPL window |
+| `Ctrl+B` | Open barcode / QR options |
 | `Ctrl+Shift+B` | Open batch labels window |
 | `F5` | Refresh printer list |
 
