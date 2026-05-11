@@ -37,3 +37,31 @@ def test_label_spec_rejects_bad_copies():
 def test_label_spec_history_label():
     spec = LabelSpec.from_raw(line1="A", line2="B")
     assert spec.history_label() == "A  |  B"
+
+
+def test_label_spec_accepts_multiple_text_lines():
+    spec = LabelSpec.from_raw(lines=["Line 1", "Line 2", "Line 3"])
+    assert spec.text_lines == ("Line 1", "Line 2", "Line 3")
+    assert spec.line1 == "Line 1"
+    assert spec.line2 == "Line 2"
+    assert "^FDLine 1\\&Line 2\\&Line 3^FS" in spec.to_zpl()
+
+
+def test_label_spec_rejects_too_many_lines():
+    with pytest.raises(LabelSpecError, match="at most"):
+        LabelSpec.from_raw(lines=[str(i) for i in range(13)])
+
+
+def test_label_spec_rejects_bad_alignment_and_rotation():
+    with pytest.raises(LabelSpecError, match="alignment"):
+        LabelSpec.from_raw(alignment="diagonal")
+    with pytest.raises(LabelSpecError, match="rotation"):
+        LabelSpec.from_raw(rotation="45")
+
+
+def test_label_spec_supports_offsets_line_gap_and_no_auto_fit():
+    spec = LabelSpec.from_raw(lines=["A", "B"], line_gap="18", offset_x="7", offset_y="-2", auto_fit="false")
+    assert spec.line_gap == 18
+    assert spec.offset_x == 7
+    assert spec.offset_y == -2
+    assert spec.auto_fit is False

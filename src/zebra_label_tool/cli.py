@@ -12,10 +12,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate simple Zebra/ZPL labels.")
     parser.add_argument("line1", help="First label line")
     parser.add_argument("line2", nargs="?", default="", help="Optional second label line")
+    parser.add_argument("--line", action="append", dest="extra_lines", default=[], help="Additional text line. Can be used multiple times.")
     parser.add_argument("--width-mm", type=str, default="57", help="Label width in millimetres")
     parser.add_argument("--height-mm", type=str, default="19", help="Label height in millimetres")
     parser.add_argument("--dpi", type=str, default="300", help="Printer DPI: 203, 300, or 600")
     parser.add_argument("--font-size", type=str, default="58", help="ZPL font size in dots")
+    parser.add_argument("--font-style", choices=["A0", "A"], default="A0")
+    parser.add_argument("--alignment", choices=["left", "center", "right", "justify"], default="center")
+    parser.add_argument("--rotation", choices=["normal", "90", "180", "270"], default="normal")
+    parser.add_argument("--line-gap", type=str, default="10", help="Gap between text lines in dots")
+    parser.add_argument("--offset-x", type=str, default="0", help="Horizontal text/barcode offset in dots")
+    parser.add_argument("--offset-y", type=str, default="0", help="Vertical text/barcode offset in dots")
+    parser.add_argument("--no-auto-fit", action="store_true", help="Disable automatic font shrinking")
     parser.add_argument("--copies", type=str, default="1", help="Number of copies")
     parser.add_argument("--inverted", action="store_true", help="Print white-on-black")
     parser.add_argument("--border", action="store_true", help="Draw a border")
@@ -26,14 +34,24 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    lines = [args.line1]
+    if args.line2:
+        lines.append(args.line2)
+    lines.extend(args.extra_lines)
     try:
         spec = LabelSpec.from_raw(
-            line1=args.line1,
-            line2=args.line2,
+            lines=lines,
             width_mm=args.width_mm,
             height_mm=args.height_mm,
             dpi=args.dpi,
             font_size=args.font_size,
+            font_style=args.font_style,
+            alignment=args.alignment,
+            rotation=args.rotation,
+            line_gap=args.line_gap,
+            offset_x=args.offset_x,
+            offset_y=args.offset_y,
+            auto_fit=not args.no_auto_fit,
             copies=args.copies,
             inverted=args.inverted,
             border=args.border,

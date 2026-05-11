@@ -65,3 +65,21 @@ def test_generate_invalid_dimensions_raise_clear_error():
 def test_generate_unknown_font_style_falls_back_to_a0():
     zpl = generate_zpl("A", "", 57, 19, 58, font_style="BAD")
     assert "^A0N," in zpl
+
+
+def test_generate_multiple_text_lines():
+    zpl = generate_zpl(width_mm=57, height_mm=19, font_size=42, lines=["A", "B", "C"])
+    assert "^FBA" not in zpl
+    assert "^FDA\\&B\\&C^FS" in zpl
+    assert "^FB" in zpl
+
+
+def test_generate_text_alignment_rotation_and_gap():
+    zpl = generate_zpl("A", "B", 57, 19, 42, alignment="left", rotation="90", line_gap=18)
+    assert "^A0R," in zpl
+    assert ",18,L,0" in zpl
+
+
+def test_generate_offsets_text_origin():
+    zpl = generate_zpl("A", "", 57, 19, 42, offset_x=12)
+    assert "^FO32," in zpl

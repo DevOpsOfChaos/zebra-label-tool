@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Iterable
 
-from .zpl import SUPPORTED_FONT_STYLES, generate_zpl
+from .layout import LINE_GAP, normalize_text_lines
+from .zpl import SUPPORTED_ALIGNMENTS, SUPPORTED_FONT_STYLES, SUPPORTED_ROTATIONS, generate_zpl
 
 SUPPORTED_DPI = (203, 300, 600)
 SUPPORTED_BARCODE_POSITIONS = ("above", "below")
+MAX_TEXT_LINES = 12
 
 
 class LabelSpecError(ValueError):
@@ -35,12 +37,37 @@ def _parse_int(value: Any, field_name: str, minimum: int = 1) -> int:
     return parsed
 
 
+def _parse_signed_int(value: Any, field_name: str) -> int:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise LabelSpecError(f"{field_name} must be a whole number") from exc
+
+
+def _parse_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
+
+
+def _parse_lines(lines: Iterable[Any] | None, line1: Any, line2: Any) -> tuple[str, ...]:
+    if lines is None:
+        parsed = normalize_text_lines(None, str(line1 or ""), str(line2 or ""))
+    else:
+        parsed = normalize_text_lines(str(line) for line in lines)
+    parsed = [line.rstrip() for line in parsed]
+    if len(parsed) > MAX_TEXT_LINES:
+        raise LabelSpecError(f"Text can contain at most {MAX_TEXT_LINES} lines")
+    return tuple(parsed)
+
+
 @dataclass(frozen=True)
 class LabelSpec:
     """Complete, validated input for one label generation request."""
 
-    line1: str = ""
-    line2: str = ""
+    text_lines: tuple[str, ...] = field(default_factory=lambda: ("",))
     width_mm: float = 57
     height_mm: float = 19
     font_size: int = 58
@@ -52,6 +79,12 @@ class LabelSpec:
     barcode_text: str = ""
     barcode_pos: str = "below"
     font_style: str = "A0"
+    alignment: str = "center"
+    rotation: str = "normal"
+    line_gap: int = LINE_GAP
+    offset_x: int = 0
+    offset_y: int = 0
+    auto_fit: bool = True
 
     @classmethod
     def from_raw(
@@ -59,6 +92,7 @@ class LabelSpec:
         *,
         line1: Any = "",
         line2: Any = "",
+        lines: Iterable[Any] | None = None,
         width_mm: Any = 57,
         height_mm: Any = 19,
         font_size: Any = 58,
@@ -70,6 +104,12 @@ class LabelSpec:
         barcode_text: Any = "",
         barcode_pos: str = "below",
         font_style: str = "A0",
+        alignment: str = "center",
+        rotation: str = "normal",
+        line_gap: Any = LINE_GAP,
+        offset_x: Any = 0,
+        offset_y: Any = 0,
+        auto_fit: Any = True,
     ) -> "LabelSpec":
         parsed_dpi = _parse_int(dpi, "DPI", minimum=1)
         if parsed_dpi not in SUPPORTED_DPI:
@@ -83,25 +123,48 @@ class LabelSpec:
         if parsed_font_style not in SUPPORTED_FONT_STYLES:
             parsed_font_style = "A0"
 
+        parsed_alignment = str(alignment or "center").strip().split()[0].lower()
+        if parsed_alignment not in SUPPORTED_ALIGNMENTS:
+            raise LabelSpecError("Text alignment must be left, center, right, or justify")
+
+        parsed_rotation = str(rotation or "normal").strip().split()[0].lower()
+        if parsed_rotation not in SUPPORTED_ROTATIONS:
+            raise LabelSpecError("Text rotation must be normal, 90, 180, or 270")
+
+        parsed_line_gap = _parse_int(line_gap, "Line gap", minimum=0)
+
         return cls(
-            line1=str(line1 or ""),
-            line2=str(line2 or ""),
+            text_lines=_parse_lines(lines, line1, line2),
             width_mm=_parse_float(width_mm, "Width"),
             height_mm=_parse_float(height_mm, "Height"),
             font_size=_parse_int(font_size, "Font size", minimum=1),
             dpi=parsed_dpi,
             copies=_parse_int(copies, "Copies", minimum=1),
-            inverted=bool(inverted),
-            border=bool(border),
-            barcode=bool(barcode),
+            inverted=_parse_bool(inverted),
+            border=_parse_bool(border),
+            barcode=_parse_bool(barcode),
             barcode_text=str(barcode_text or ""),
             barcode_pos=parsed_barcode_pos,
             font_style=parsed_font_style,
+            alignment=parsed_alignment,
+            rotation=parsed_rotation,
+            line_gap=parsed_line_gap,
+            offset_x=_parse_signed_int(offset_x, "Horizontal offset"),
+            offset_y=_parse_signed_int(offset_y, "Vertical offset"),
+            auto_fit=_parse_bool(auto_fit),
         )
 
     @property
+    def line1(self) -> str:
+        return self.text_lines[0] if self.text_lines else ""
+
+    @property
+    def line2(self) -> str:
+        return self.text_lines[1] if len(self.text_lines) > 1 else ""
+
+    @property
     def has_text(self) -> bool:
-        return bool(self.line1.strip() or self.line2.strip())
+        return any(line.strip() for line in self.text_lines)
 
     @property
     def active_barcode(self) -> bool:
@@ -109,8 +172,6 @@ class LabelSpec:
 
     def to_zpl(self) -> str:
         return generate_zpl(
-            line1=self.line1,
-            line2=self.line2,
             width_mm=self.width_mm,
             height_mm=self.height_mm,
             font_size=self.font_size,
@@ -122,9 +183,15 @@ class LabelSpec:
             barcode_text=self.barcode_text,
             barcode_pos=self.barcode_pos,
             font_style=self.font_style,
+            lines=self.text_lines,
+            alignment=self.alignment,
+            rotation=self.rotation,
+            line_gap=self.line_gap,
+            offset_x=self.offset_x,
+            offset_y=self.offset_y,
+            auto_fit=self.auto_fit,
         )
 
     def history_label(self) -> str:
-        line1 = self.line1.strip()
-        line2 = self.line2.strip()
-        return line1 + (f"  |  {line2}" if line2 else "")
+        visible = [line.strip() for line in self.text_lines if line.strip()]
+        return "  |  ".join(visible[:3]) + (" ..." if len(visible) > 3 else "")

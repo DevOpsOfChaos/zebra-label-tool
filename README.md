@@ -11,20 +11,20 @@ Zebra printers are reliable, and ZPL is powerful. Everyday label creation can st
 Zebra Label Tool focuses on a small workflow:
 
 1. choose label size and DPI,
-2. enter one or two text lines,
-3. optionally add border, inversion, or a Code128 barcode,
+2. enter the label text as one or more rows,
+3. tune advanced label/text/barcode options from the top menu,
 4. preview the result,
-5. print or copy the generated ZPL.
+5. print, export, import, or copy the generated ZPL when needed.
 
 ## Current status
 
-Early public prototype. The core ZPL/layout logic is separated and tested. The desktop UI is functional and kept intentionally simple.
+Early public prototype. The core ZPL/layout logic is separated and tested. The desktop UI is now focused on the daily workflow, while advanced options live in top-level menus instead of crowding the main window.
 
 Windows RAW printing is supported through `pywin32`. On non-Windows systems the ZPL generator and CLI can still be used, but direct printer discovery/printing is disabled.
 
 ## Features
 
-- Simple one-line and two-line label editor
+- Multi-line label text editor
 - Live canvas preview using the same layout calculation as the ZPL generator
 - ZPL generation for Zebra-compatible printers
 - Copy generated ZPL to the clipboard
@@ -33,10 +33,11 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Direct RAW printing to installed Windows printers
 - Common DPI presets: 203, 300, 600
 - Common label size shortcuts
-- Font size control
+- Font size, font style, alignment, rotation, line gap, offset, and auto-fit controls
 - Optional inverted label output
 - Optional border
 - Optional Code128 barcode
+- Top menu workflow for Label, Text, Barcode, and ZPL tools
 - Templates
 - Print history
 - Safer input validation before print/copy/export
@@ -102,6 +103,10 @@ zebra-label-tool-gui
 | `Ctrl+N` | Clear text/barcode for a new label |
 | `Ctrl+S` | Save current settings |
 | `Ctrl+C` | Copy generated ZPL |
+| `Ctrl+L` | Open label setup |
+| `Ctrl+T` | Open text options |
+| `Ctrl+B` | Open barcode options |
+| `Ctrl+Z` | Show generated ZPL window |
 | `F5` | Refresh printer list |
 
 ### Generate ZPL from the command line
@@ -110,10 +115,16 @@ zebra-label-tool-gui
 python -m zebra_label_tool "Sonderverschraubungen" --width-mm 57 --height-mm 17 --dpi 300
 ```
 
-Example with two lines and a barcode:
+Example with multiple lines and a barcode:
 
 ```powershell
-python -m zebra_label_tool "Shelf A-12" "Box 04" --barcode "A12-04" --border
+python -m zebra_label_tool "Shelf A-12" "Box 04" --line "Batch 7" --barcode "A12-04" --border
+```
+
+Example with text options:
+
+```powershell
+python -m zebra_label_tool "Motor" "230 V" --alignment left --rotation normal --line-gap 14 --offset-x 10
 ```
 
 ## Project structure
@@ -124,6 +135,7 @@ src/zebra_label_tool/
   cli.py        # command line ZPL generation
   layout.py     # pure label geometry/layout calculations
   preview.py    # canvas preview
+  label_spec.py # shared validated label request model
   printing.py   # Windows RAW printing backend
   settings.py   # per-user settings persistence
   zpl.py        # pure ZPL generation
@@ -149,6 +161,7 @@ Near-term:
 - Add packaged Windows release build
 - Add QR code support
 - Improve validation and user-facing error messages
+- Add a few real-world label template examples
 - Improve visual polish of the desktop UI
 
 Later:

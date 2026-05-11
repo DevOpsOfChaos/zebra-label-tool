@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import re
 
-from .layout import mm_to_dots
+SUPPORTED_ALIGN_CODES = {"L": "left", "C": "center", "R": "right", "J": "justify"}
+SUPPORTED_ROT_CODES = {"N": "normal", "R": "90", "I": "180", "B": "270"}
 
 
 @dataclass(frozen=True)
 class ImportedZplLabel:
-    line1: str = ""
-    line2: str = ""
+    text_lines: tuple[str, ...] = field(default_factory=lambda: ("",))
     width_mm: float | None = None
     height_mm: float | None = None
     copies: int = 1
@@ -22,24 +22,30 @@ class ImportedZplLabel:
     barcode_pos: str = "below"
     font_size: int | None = None
     font_style: str = "A0"
+    alignment: str = "center"
+    rotation: str = "normal"
+    line_gap: int = 10
+
+    @property
+    def line1(self) -> str:
+        return self.text_lines[0] if self.text_lines else ""
+
+    @property
+    def line2(self) -> str:
+        return self.text_lines[1] if len(self.text_lines) > 1 else ""
 
 
 def _dots_to_mm(dots: int, dpi: int) -> float:
     return round(dots * 25.4 / dpi, 1)
 
 
-def _extract_text_payload(zpl: str) -> tuple[str, str]:
+def _extract_text_payload(zpl: str) -> tuple[str, ...]:
     matches = re.findall(r"\^FD(.*?)\^FS", zpl, flags=re.DOTALL)
     if not matches:
-        return "", ""
+        return ("",)
 
-    # The generated text payload is the first ^FD block unless that block is clearly a barcode value.
     text_payload = matches[0].replace("^FR", "")
-    text_payload = text_payload.replace("\\&", "\n")
-    parts = text_payload.split("\n", 1)
-    line1 = parts[0]
-    line2 = parts[1] if len(parts) > 1 else ""
-    return line1, line2
+    return tuple(text_payload.replace("\\&", "\n").split("\n")) or ("",)
 
 
 def parse_simple_zpl(zpl: str, dpi: int = 300) -> ImportedZplLabel:
@@ -51,24 +57,23 @@ def parse_simple_zpl(zpl: str, dpi: int = 300) -> ImportedZplLabel:
     width_match = re.search(r"\^PW(\d+)", zpl)
     height_match = re.search(r"\^LL(\d+)", zpl)
     copies_match = re.search(r"\^PQ(\d+)", zpl)
-    font_match = re.search(r"\^([A-Z0-9]+)N,(\d+),(\d+)", zpl)
+    font_match = re.search(r"\^([A-Z0-9]+)([NRIB]),(\d+),(\d+)", zpl)
+    fb_match = re.search(r"\^FB\d+,(\d+),(\d+),([LCRJ]),", zpl)
 
-    line1, line2 = _extract_text_payload(zpl)
+    text_lines = _extract_text_payload(zpl)
 
     barcode_match = re.search(r"\^BCN,\d+,Y,N,N\s*\^FD(.*?)\^FS", zpl, flags=re.DOTALL)
     barcode_text = barcode_match.group(1).strip() if barcode_match else ""
 
-    text_pos = re.search(r"\^FO\d+,(\d+)\s*\n\^[A-Z0-9]+N,", zpl)
+    text_pos = re.search(r"\^FO\d+,(\d+)\s*\n\^[A-Z0-9]+[NRIB],", zpl)
     barcode_pos = "below"
     if barcode_match and text_pos:
-        # Compare first barcode ^FO against text ^FO where possible.
         barcode_fo = re.search(r"\^FO\d+,(\d+)\s*\n\^BCN", zpl)
         if barcode_fo and int(barcode_fo.group(1)) < int(text_pos.group(1)):
             barcode_pos = "above"
 
     return ImportedZplLabel(
-        line1=line1,
-        line2=line2,
+        text_lines=text_lines,
         width_mm=_dots_to_mm(int(width_match.group(1)), dpi) if width_match else None,
         height_mm=_dots_to_mm(int(height_match.group(1)), dpi) if height_match else None,
         copies=int(copies_match.group(1)) if copies_match else 1,
@@ -77,6 +82,9 @@ def parse_simple_zpl(zpl: str, dpi: int = 300) -> ImportedZplLabel:
         barcode=bool(barcode_match),
         barcode_text=barcode_text,
         barcode_pos=barcode_pos,
-        font_size=int(font_match.group(2)) if font_match else None,
+        font_size=int(font_match.group(3)) if font_match else None,
         font_style=font_match.group(1) if font_match else "A0",
+        rotation=SUPPORTED_ROT_CODES.get(font_match.group(2), "normal") if font_match else "normal",
+        alignment=SUPPORTED_ALIGN_CODES.get(fb_match.group(3), "center") if fb_match else "center",
+        line_gap=int(fb_match.group(2)) if fb_match else 10,
     )

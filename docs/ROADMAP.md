@@ -18,6 +18,8 @@ The project should stay small and technician-friendly. New features should reduc
 - Real screenshots
 - Better validation messages
 - `.zpl` export/import
+- Menu-based advanced options
+- Multi-line label text editor
 - QR code support
 - Windows packaged release
 - More useful label presets
@@ -35,3 +37,4 @@ The project should stay small and technician-friendly. New features should reduc
 - Batch preview
 - Batch print safeguards
 - Template variables
+- Table-style editor for batch labels

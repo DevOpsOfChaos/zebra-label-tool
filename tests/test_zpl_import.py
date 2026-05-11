@@ -26,3 +26,14 @@ def test_parse_simple_zpl_recovers_inverted():
     zpl = generate_zpl("A", "", 57, 19, 58, inverted=True)
     imported = parse_simple_zpl(zpl)
     assert imported.inverted is True
+
+
+def test_parse_simple_zpl_recovers_multiple_lines_and_text_options():
+    zpl = generate_zpl(width_mm=57, height_mm=19, font_size=42, lines=["A", "B", "C"], alignment="right", rotation="90", line_gap=18)
+    imported = parse_simple_zpl(zpl)
+    assert imported.text_lines == ("A", "B", "C")
+    assert imported.line1 == "A"
+    assert imported.line2 == "B"
+    assert imported.alignment == "right"
+    assert imported.rotation == "90"
+    assert imported.line_gap == 18
