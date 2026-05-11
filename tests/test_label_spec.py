@@ -65,3 +65,21 @@ def test_label_spec_supports_offsets_line_gap_and_no_auto_fit():
     assert spec.offset_x == 7
     assert spec.offset_y == -2
     assert spec.auto_fit is False
+
+
+def test_label_spec_supports_qr_code_fields():
+    spec = LabelSpec.from_raw(line1="Device", barcode=True, barcode_text="https://example.local", barcode_type="QR Code", barcode_magnification="6")
+    assert spec.barcode_type == "qr"
+    assert spec.barcode_magnification == 6
+    assert "^BQN,2,6" in spec.to_zpl()
+
+
+def test_label_spec_rejects_invalid_ean_payload():
+    with pytest.raises(LabelSpecError, match="EAN-13"):
+        LabelSpec.from_raw(line1="Retail", barcode=True, barcode_text="ABC", barcode_type="ean13")
+
+
+def test_label_spec_does_not_validate_inactive_barcode_payload():
+    spec = LabelSpec.from_raw(line1="Retail", barcode=False, barcode_text="ABC", barcode_type="ean13")
+    assert spec.barcode is False
+    assert "^BE" not in spec.to_zpl()

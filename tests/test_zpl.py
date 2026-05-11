@@ -83,3 +83,28 @@ def test_generate_text_alignment_rotation_and_gap():
 def test_generate_offsets_text_origin():
     zpl = generate_zpl("A", "", 57, 19, 42, offset_x=12)
     assert "^FO32," in zpl
+
+
+def test_generate_qr_code_zpl():
+    zpl = generate_zpl("Device", "ESP32", 57, 29, 32, barcode=True, barcode_text="https://example.local/device/1", barcode_type="qr", barcode_magnification=5)
+    assert "^BQN,2,5" in zpl
+    assert "^FDLA,https://example.local/device/1^FS" in zpl
+
+
+def test_generate_code39_and_hides_human_text():
+    zpl = generate_zpl("A", "", 57, 19, 42, barcode=True, barcode_text="abc-123", barcode_type="code39", barcode_show_text=False)
+    assert "^B3N,N," in zpl
+    assert ",N,N" in zpl
+    assert "^FDABC-123^FS" in zpl
+
+
+def test_generate_ean13_rejects_non_numeric_content():
+    with pytest.raises(ValueError, match="EAN-13"):
+        generate_zpl("A", "", 57, 19, 42, barcode=True, barcode_text="ABC", barcode_type="ean13")
+
+
+def test_generate_datamatrix_and_pdf417_zpl():
+    dm = generate_zpl("Part", "", 57, 29, 32, barcode=True, barcode_text="PART-42", barcode_type="datamatrix", barcode_magnification=4)
+    pdf = generate_zpl("Part", "", 57, 29, 32, barcode=True, barcode_text="PART-42", barcode_type="pdf417", barcode_height=80)
+    assert "^BXN,4,200" in dm
+    assert "^B7N,80" in pdf

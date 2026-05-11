@@ -33,12 +33,15 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Direct RAW printing to installed Windows printers
 - Common DPI presets: 203, 300, 600
 - Common label size shortcuts
-- Built-in presets for device labels, asset tags, storage bins, and cable markers
-- Font size, font style, alignment, rotation, line gap, offset, and auto-fit controls
+- Built-in presets for device labels, asset tags, QR device links, storage bins, and cable markers
+- Main-window text controls for font size, alignment, and auto-fit
+- Advanced font style, rotation, line gap, and offset controls
 - Optional inverted label output
 - Optional border
-- Optional Code128 barcode
-- Top menu workflow for Label, Text, Barcode, ZPL, text cleanup, and batch tools
+- Optional linear barcodes: Code 128, Code 39, EAN-13, UPC-A
+- Optional 2D codes: QR Code, Data Matrix, PDF417
+- Barcode/QR setup through the top menu to keep the main window clean
+- Top menu workflow for Label, Text, Barcode/QR, ZPL, text cleanup, and batch tools
 - Text cleanup actions: trim whitespace, remove empty lines, uppercase, lowercase, title case, and wrap long lines
 - Batch label ZPL generation from pasted text blocks
 - Layout quality warnings for auto-fit, empty labels, long barcodes, and line limits
@@ -126,6 +129,12 @@ Example with multiple lines and a barcode:
 python -m zebra_label_tool "Shelf A-12" "Box 04" --line "Batch 7" --barcode "A12-04" --border
 ```
 
+Example with QR code:
+
+```powershell
+python -m zebra_label_tool "Device" "ESP32" --barcode "https://example.local/device/1" --barcode-type qr --barcode-magnification 5
+```
+
 Example with text options:
 
 ```powershell
@@ -137,6 +146,7 @@ python -m zebra_label_tool "Motor" "230 V" --alignment left --rotation normal --
 ```text
 src/zebra_label_tool/
   app.py        # CustomTkinter desktop app
+  barcodes.py   # barcode/QR metadata, aliases and payload validation
   batch.py      # batch label ZPL helpers
   cli.py        # command line ZPL generation
   layout.py     # pure label geometry/layout calculations
@@ -167,14 +177,13 @@ Near-term:
 
 - Add real screenshots
 - Add packaged Windows release build
-- Add QR code support
 - Add network printer backend for TCP port 9100
 - Improve visual polish after real Windows review
 - Add batch preview and CSV import
 
 Later:
 
-- More barcode types
+- More barcode tuning options and scanner-oriented validation
 - Template sharing
 - Template variables
 - Better preview/rendering options

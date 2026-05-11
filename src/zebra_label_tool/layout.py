@@ -105,19 +105,21 @@ def calculate_layout_for_lines(
     offset_x: int = 0,
     offset_y: int = 0,
     auto_fit: bool = True,
+    barcode_height: int = BAR_H,
 ) -> LabelLayout:
     """Calculate shared positions for multi-line preview and ZPL output."""
     if barcode_pos not in {"above", "below"}:
         raise ValueError("barcode_pos must be 'above' or 'below'")
     if line_gap < 0:
         raise ValueError("line_gap must not be negative")
+    barcode_height = max(20, int(barcode_height or BAR_H))
 
     pw = mm_to_dots(width_mm, dpi)
     ll = mm_to_dots(height_mm, dpi)
     text_lines = normalize_text_lines(lines)
 
     has_bar = barcode and bool((barcode_text or "").strip())
-    reserved_barcode_h = BAR_H + BAR_GAP + 10 if has_bar else 0
+    reserved_barcode_h = barcode_height + BAR_GAP + 10 if has_bar else 0
     available_h = max(8, ll - reserved_barcode_h - max(0, offset_y))
     fs = fit_font_size(font_size, text_lines, available_h, line_gap, auto_fit=auto_fit)
 
@@ -125,14 +127,14 @@ def calculate_layout_for_lines(
     block_h = fs * num_lines + (line_gap * (num_lines - 1) if num_lines > 1 else 0)
 
     if has_bar:
-        text_area = max(8, ll - BAR_H - BAR_GAP - 10)
+        text_area = max(8, ll - barcode_height - BAR_GAP - 10)
         pos_y_text = max(4, (text_area - block_h) // 2)
         if barcode_pos == "below":
             pos_y_bar = pos_y_text + block_h + BAR_GAP
         else:
-            pos_y_bar = max(2, pos_y_text - BAR_H - BAR_GAP)
-            pos_y_text = pos_y_bar + BAR_H + BAR_GAP
-        pos_y_bar = max(2, min(pos_y_bar, ll - BAR_H - 4))
+            pos_y_bar = max(2, pos_y_text - barcode_height - BAR_GAP)
+            pos_y_text = pos_y_bar + barcode_height + BAR_GAP
+        pos_y_bar = max(2, min(pos_y_bar, ll - barcode_height - 4))
     else:
         pos_y_text = max(4, (ll - block_h) // 2)
         pos_y_bar = pos_y_text
@@ -148,7 +150,7 @@ def calculate_layout_for_lines(
         block_h=block_h,
         pos_y_text=pos_y_text,
         pos_y_bar=pos_y_bar,
-        bar_h=BAR_H,
+        bar_h=barcode_height,
         has_bar=has_bar,
         margin_x=MARGIN_X,
         line_gap=line_gap,

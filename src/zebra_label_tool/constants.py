@@ -27,7 +27,11 @@ DEFAULT_SETTINGS = {
     "inverted": False,
     "border": False,
     "barcode": False,
+    "barcode_type": "code128",
     "barcode_pos": "below",
+    "barcode_height": 40,
+    "barcode_show_text": True,
+    "barcode_magnification": 4,
     "font_style": "A0",
     "text_lines": [""],
     "alignment": "center",
@@ -41,13 +45,16 @@ DEFAULT_SETTINGS = {
     "templates": {},
 }
 
-COL_BG = "#1c1c1e"
-COL_PANEL = "#252528"
-COL_CARD = "#2c2c30"
-COL_BORDER = "#3a3a3e"
-COL_ACCENT = "#1a73e8"
-COL_SUCCESS = "#34a853"
-COL_WARN = "#fbbc04"
-COL_ERR = "#ea4335"
-COL_TEXT = "#e8e8ed"
-COL_MUTED = "#88888f"
+COL_BG = "#edf1f5"
+COL_PANEL = "#f8fafc"
+COL_CARD = "#ffffff"
+COL_CARD_ALT = "#eef3f8"
+COL_BORDER = "#cbd5e1"
+COL_ACCENT = "#2563eb"
+COL_ACCENT_DARK = "#1e40af"
+COL_SUCCESS = "#15803d"
+COL_WARN = "#b45309"
+COL_ERR = "#dc2626"
+COL_TEXT = "#111827"
+COL_MUTED = "#64748b"
+COL_SOFT = "#e2e8f0"

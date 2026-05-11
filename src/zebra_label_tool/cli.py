@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from .barcodes import BARCODE_TYPES
 from .label_spec import LabelSpec, LabelSpecError
 
 
@@ -27,8 +28,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--copies", type=str, default="1", help="Number of copies")
     parser.add_argument("--inverted", action="store_true", help="Print white-on-black")
     parser.add_argument("--border", action="store_true", help="Draw a border")
-    parser.add_argument("--barcode", default="", help="Optional Code128 barcode content")
+    parser.add_argument("--barcode", default="", help="Optional barcode/2D-code content")
+    parser.add_argument("--barcode-type", choices=list(BARCODE_TYPES), default="code128", help="Barcode/2D-code type")
     parser.add_argument("--barcode-pos", choices=["above", "below"], default="below")
+    parser.add_argument("--barcode-height", type=str, default="40", help="Linear barcode height or reserved 2D-code area in dots")
+    parser.add_argument("--hide-barcode-text", action="store_true", help="Hide human-readable text below linear barcodes")
+    parser.add_argument("--barcode-magnification", type=str, default="4", help="QR/Data Matrix module magnification")
     return parser
 
 
@@ -57,7 +62,11 @@ def main(argv: list[str] | None = None) -> int:
             border=args.border,
             barcode=bool(args.barcode),
             barcode_text=args.barcode,
+            barcode_type=args.barcode_type,
             barcode_pos=args.barcode_pos,
+            barcode_height=args.barcode_height,
+            barcode_show_text=not args.hide_barcode_text,
+            barcode_magnification=args.barcode_magnification,
         )
     except LabelSpecError as exc:
         print(f"error: {exc}", file=sys.stderr)

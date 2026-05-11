@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
+from .barcodes import BARCODE_TYPES, clamp_barcode_height, clamp_qr_magnification, normalize_barcode_type, validate_barcode_payload
 from .layout import LINE_GAP, normalize_text_lines
 from .zpl import SUPPORTED_ALIGNMENTS, SUPPORTED_FONT_STYLES, SUPPORTED_ROTATIONS, generate_zpl
 
@@ -77,7 +78,11 @@ class LabelSpec:
     border: bool = False
     barcode: bool = False
     barcode_text: str = ""
+    barcode_type: str = "code128"
     barcode_pos: str = "below"
+    barcode_height: int = 40
+    barcode_show_text: bool = True
+    barcode_magnification: int = 4
     font_style: str = "A0"
     alignment: str = "center"
     rotation: str = "normal"
@@ -102,7 +107,11 @@ class LabelSpec:
         border: bool = False,
         barcode: bool = False,
         barcode_text: Any = "",
+        barcode_type: str = "code128",
         barcode_pos: str = "below",
+        barcode_height: Any = 40,
+        barcode_show_text: Any = True,
+        barcode_magnification: Any = 4,
         font_style: str = "A0",
         alignment: str = "center",
         rotation: str = "normal",
@@ -118,6 +127,16 @@ class LabelSpec:
         parsed_barcode_pos = str(barcode_pos or "below").strip().split()[0].lower()
         if parsed_barcode_pos not in SUPPORTED_BARCODE_POSITIONS:
             raise LabelSpecError("Barcode position must be above or below")
+
+        parsed_barcode_enabled = _parse_bool(barcode)
+        raw_barcode_text = str(barcode_text or "")
+        try:
+            parsed_barcode_type = normalize_barcode_type(barcode_type)
+            parsed_barcode_text = validate_barcode_payload(parsed_barcode_type, raw_barcode_text) if parsed_barcode_enabled and raw_barcode_text.strip() else raw_barcode_text
+        except ValueError as exc:
+            raise LabelSpecError(str(exc)) from exc
+        parsed_barcode_height = clamp_barcode_height(barcode_height, parsed_barcode_type)
+        parsed_barcode_magnification = clamp_qr_magnification(barcode_magnification)
 
         parsed_font_style = str(font_style or "A0").strip().split()[0]
         if parsed_font_style not in SUPPORTED_FONT_STYLES:
@@ -142,9 +161,13 @@ class LabelSpec:
             copies=_parse_int(copies, "Copies", minimum=1),
             inverted=_parse_bool(inverted),
             border=_parse_bool(border),
-            barcode=_parse_bool(barcode),
-            barcode_text=str(barcode_text or ""),
+            barcode=parsed_barcode_enabled,
+            barcode_text=parsed_barcode_text,
+            barcode_type=parsed_barcode_type,
             barcode_pos=parsed_barcode_pos,
+            barcode_height=parsed_barcode_height,
+            barcode_show_text=_parse_bool(barcode_show_text),
+            barcode_magnification=parsed_barcode_magnification,
             font_style=parsed_font_style,
             alignment=parsed_alignment,
             rotation=parsed_rotation,
@@ -181,7 +204,11 @@ class LabelSpec:
             border=self.border,
             barcode=self.barcode,
             barcode_text=self.barcode_text,
+            barcode_type=self.barcode_type,
             barcode_pos=self.barcode_pos,
+            barcode_height=self.barcode_height,
+            barcode_show_text=self.barcode_show_text,
+            barcode_magnification=self.barcode_magnification,
             font_style=self.font_style,
             lines=self.text_lines,
             alignment=self.alignment,

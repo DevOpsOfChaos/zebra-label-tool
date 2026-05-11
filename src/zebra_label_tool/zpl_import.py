@@ -19,7 +19,11 @@ class ImportedZplLabel:
     border: bool = False
     barcode: bool = False
     barcode_text: str = ""
+    barcode_type: str = "code128"
     barcode_pos: str = "below"
+    barcode_height: int = 40
+    barcode_show_text: bool = True
+    barcode_magnification: int = 4
     font_size: int | None = None
     font_style: str = "A0"
     alignment: str = "center"
@@ -44,8 +48,40 @@ def _extract_text_payload(zpl: str) -> tuple[str, ...]:
     if not matches:
         return ("",)
 
+    # Use the first ^FD after the ^FB text block when present. Barcode payloads follow later.
     text_payload = matches[0].replace("^FR", "")
+    if text_payload.startswith("LA,") and "^BQ" in zpl:
+        text_payload = matches[1] if len(matches) > 1 else ""
     return tuple(text_payload.replace("\\&", "\n").split("\n")) or ("",)
+
+
+def _detect_barcode(zpl: str) -> tuple[bool, str, str, int, bool, int]:
+    patterns = [
+        ("code128", r"\^BCN,(\d+),([YN]),N,N\s*\^FD(.*?)\^FS"),
+        ("code39", r"\^B3N,N,(\d+),([YN]),N\s*\^FD(.*?)\^FS"),
+        ("ean13", r"\^BEN,(\d+),([YN]),N\s*\^FD(.*?)\^FS"),
+        ("upca", r"\^BUN,(\d+),([YN]),N\s*\^FD(.*?)\^FS"),
+        ("pdf417", r"\^B7N,(\d+),[^\n]*\s*\^FD(.*?)\^FS"),
+    ]
+    for key, pattern in patterns:
+        match = re.search(pattern, zpl, flags=re.DOTALL)
+        if not match:
+            continue
+        if key == "pdf417":
+            return True, key, match.group(2).strip(), int(match.group(1)), False, 4
+        return True, key, match.group(3).strip(), int(match.group(1)), match.group(2) == "Y", 4
+
+    qr_match = re.search(r"\^BQN,2,(\d+)\s*\^FDLA,(.*?)\^FS", zpl, flags=re.DOTALL)
+    if qr_match:
+        mag = int(qr_match.group(1))
+        return True, "qr", qr_match.group(2).strip(), max(40, mag * 18), False, mag
+
+    dm_match = re.search(r"\^BXN,(\d+),[^\n]*\s*\^FD(.*?)\^FS", zpl, flags=re.DOTALL)
+    if dm_match:
+        mag = int(dm_match.group(1))
+        return True, "datamatrix", dm_match.group(2).strip(), max(40, mag * 18), False, mag
+
+    return False, "code128", "", 40, True, 4
 
 
 def parse_simple_zpl(zpl: str, dpi: int = 300) -> ImportedZplLabel:
@@ -61,14 +97,12 @@ def parse_simple_zpl(zpl: str, dpi: int = 300) -> ImportedZplLabel:
     fb_match = re.search(r"\^FB\d+,(\d+),(\d+),([LCRJ]),", zpl)
 
     text_lines = _extract_text_payload(zpl)
-
-    barcode_match = re.search(r"\^BCN,\d+,Y,N,N\s*\^FD(.*?)\^FS", zpl, flags=re.DOTALL)
-    barcode_text = barcode_match.group(1).strip() if barcode_match else ""
+    barcode, barcode_type, barcode_text, barcode_height, barcode_show_text, barcode_magnification = _detect_barcode(zpl)
 
     text_pos = re.search(r"\^FO\d+,(\d+)\s*\n\^[A-Z0-9]+[NRIB],", zpl)
     barcode_pos = "below"
-    if barcode_match and text_pos:
-        barcode_fo = re.search(r"\^FO\d+,(\d+)\s*\n\^BCN", zpl)
+    if barcode and text_pos:
+        barcode_fo = re.search(r"\^FO\d+,(\d+)\s*\n\^(?:BC|B3|BE|BU|BQ|BX|B7)", zpl)
         if barcode_fo and int(barcode_fo.group(1)) < int(text_pos.group(1)):
             barcode_pos = "above"
 
@@ -79,9 +113,13 @@ def parse_simple_zpl(zpl: str, dpi: int = 300) -> ImportedZplLabel:
         copies=int(copies_match.group(1)) if copies_match else 1,
         inverted="^FR^FD" in zpl or "^FO0,0^GB" in zpl,
         border=bool(re.search(r"\^FO2,2\^GB", zpl)),
-        barcode=bool(barcode_match),
+        barcode=barcode,
         barcode_text=barcode_text,
+        barcode_type=barcode_type,
         barcode_pos=barcode_pos,
+        barcode_height=barcode_height,
+        barcode_show_text=barcode_show_text,
+        barcode_magnification=barcode_magnification,
         font_size=int(font_match.group(3)) if font_match else None,
         font_style=font_match.group(1) if font_match else "A0",
         rotation=SUPPORTED_ROT_CODES.get(font_match.group(2), "normal") if font_match else "normal",

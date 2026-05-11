@@ -37,3 +37,12 @@ def test_parse_simple_zpl_recovers_multiple_lines_and_text_options():
     assert imported.alignment == "right"
     assert imported.rotation == "90"
     assert imported.line_gap == 18
+
+
+def test_parse_simple_zpl_recovers_qr_code():
+    zpl = generate_zpl("Device", "ESP32", 57, 29, 32, barcode=True, barcode_text="DEV-1", barcode_type="qr", barcode_magnification=5)
+    imported = parse_simple_zpl(zpl)
+    assert imported.barcode is True
+    assert imported.barcode_type == "qr"
+    assert imported.barcode_text == "DEV-1"
+    assert imported.barcode_magnification == 5

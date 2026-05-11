@@ -15,3 +15,11 @@ def test_cli_rejects_invalid_width(capsys):
     captured = capsys.readouterr()
     assert exit_code == 2
     assert "Width" in captured.err
+
+
+def test_cli_generates_qr_code(capsys):
+    exit_code = main(["Device", "--barcode", "DEV-1", "--barcode-type", "qr", "--barcode-magnification", "5"])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "^BQN,2,5" in captured.out
+    assert "^FDLA,DEV-1^FS" in captured.out

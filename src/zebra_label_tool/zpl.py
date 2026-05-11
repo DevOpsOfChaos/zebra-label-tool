@@ -4,6 +4,14 @@ from __future__ import annotations
 
 from typing import Iterable
 
+from .barcodes import (
+    BARCODE_TYPES,
+    clamp_barcode_height,
+    clamp_qr_magnification,
+    is_2d_barcode,
+    normalize_barcode_type,
+    validate_barcode_payload,
+)
 from .layout import MARGIN_X, calculate_layout_for_lines, normalize_text_lines
 
 SUPPORTED_FONT_STYLES = {"A0", "A"}
@@ -28,6 +36,38 @@ def _rotation_code(rotation: str) -> str:
     return SUPPORTED_ROTATIONS.get(str(rotation or "normal").strip().lower(), "N")
 
 
+def _barcode_zpl(
+    *,
+    barcode_type: str,
+    barcode_text: str,
+    x: int,
+    y: int,
+    height: int,
+    show_text: bool,
+    magnification: int,
+) -> list[str]:
+    """Return ZPL lines for the selected barcode or 2D symbology."""
+    key = normalize_barcode_type(barcode_type)
+    text = validate_barcode_payload(key, _clean_text(barcode_text))
+    human = "Y" if show_text and BARCODE_TYPES[key].supports_human_readable else "N"
+
+    if key == "code128":
+        return [f"^FO{x},{y}", f"^BCN,{height},{human},N,N", f"^FD{text}^FS"]
+    if key == "code39":
+        return [f"^FO{x},{y}", f"^B3N,N,{height},{human},N", f"^FD{text}^FS"]
+    if key == "ean13":
+        return [f"^FO{x},{y}", f"^BEN,{height},{human},N", f"^FD{text}^FS"]
+    if key == "upca":
+        return [f"^FO{x},{y}", f"^BUN,{height},{human},N", f"^FD{text}^FS"]
+    if key == "qr":
+        return [f"^FO{x},{y}", f"^BQN,2,{magnification}", f"^FDLA,{text}^FS"]
+    if key == "datamatrix":
+        return [f"^FO{x},{y}", f"^BXN,{magnification},200", f"^FD{text}^FS"]
+    if key == "pdf417":
+        return [f"^FO{x},{y}", f"^B7N,{height},5,4,8,N", f"^FD{text}^FS"]
+    raise ValueError(f"Unsupported barcode type: {barcode_type}")
+
+
 def generate_zpl(
     line1: str = "",
     line2: str = "",
@@ -50,14 +90,20 @@ def generate_zpl(
     offset_x: int = 0,
     offset_y: int = 0,
     auto_fit: bool = True,
+    barcode_type: str = "code128",
+    barcode_height: int = 40,
+    barcode_show_text: bool = True,
+    barcode_magnification: int = 4,
 ) -> str:
-    """Generate ZPL for a simple text label.
+    """Generate ZPL for a simple multi-line text label.
 
     The legacy line1/line2 arguments are still supported. New callers should pass
     ``lines`` so labels are no longer limited to two text rows.
     """
     text_lines = _clean_lines(normalize_text_lines(lines, line1, line2))
-    barcode_text = _clean_text(barcode_text).strip()
+    barcode_type = normalize_barcode_type(barcode_type)
+    raw_barcode_text = _clean_text(barcode_text).strip()
+    barcode_text = validate_barcode_payload(barcode_type, raw_barcode_text) if barcode and raw_barcode_text else raw_barcode_text
     copies = max(1, int(copies))
     font_style = font_style if font_style in SUPPORTED_FONT_STYLES else "A0"
     align_code = _alignment_code(alignment)
@@ -65,6 +111,9 @@ def generate_zpl(
     line_gap = max(0, int(line_gap))
     offset_x = int(offset_x)
     offset_y = int(offset_y)
+    barcode_height = clamp_barcode_height(barcode_height, barcode_type)
+    barcode_magnification = clamp_qr_magnification(barcode_magnification)
+    effective_barcode_height = barcode_height if not is_2d_barcode(barcode_type) else max(barcode_height, barcode_magnification * 18)
 
     layout = calculate_layout_for_lines(
         text_lines,
@@ -79,6 +128,7 @@ def generate_zpl(
         offset_x=offset_x,
         offset_y=offset_y,
         auto_fit=auto_fit,
+        barcode_height=effective_barcode_height,
     )
 
     printable_w = max(1, layout.pw - MARGIN_X * 2 - max(0, abs(offset_x)))
@@ -102,11 +152,15 @@ def generate_zpl(
     ]
 
     if layout.has_bar:
-        zpl += [
-            f"^FO{max(0, MARGIN_X + offset_x)},{layout.pos_y_bar}",
-            f"^BCN,{layout.bar_h},Y,N,N",
-            f"^FD{barcode_text}^FS",
-        ]
+        zpl += _barcode_zpl(
+            barcode_type=barcode_type,
+            barcode_text=barcode_text,
+            x=max(0, MARGIN_X + offset_x),
+            y=layout.pos_y_bar,
+            height=layout.bar_h,
+            show_text=bool(barcode_show_text),
+            magnification=barcode_magnification,
+        )
 
     zpl.append("^XZ")
     return "\n".join(zpl)
