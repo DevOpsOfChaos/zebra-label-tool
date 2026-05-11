@@ -79,16 +79,30 @@ def is_2d_barcode(key: str) -> bool:
     return BARCODE_TYPES[normalize_barcode_type(key)].category == "2d"
 
 
+
+def _gtin_check_digit(digits_without_check: str) -> str:
+    total = 0
+    reversed_digits = list(map(int, reversed(digits_without_check)))
+    for index, digit in enumerate(reversed_digits):
+        total += digit * (3 if index % 2 == 0 else 1)
+    return str((10 - (total % 10)) % 10)
+
 def validate_barcode_payload(barcode_type: str, payload: str) -> str:
     """Validate and normalize barcode payload where a symbology has hard constraints."""
     key = normalize_barcode_type(barcode_type)
     text = str(payload or "").strip()
     if not text:
         return text
-    if key == "ean13" and not re.fullmatch(r"\d{12,13}", text):
-        raise ValueError("EAN-13 content must contain 12 or 13 digits")
-    if key == "upca" and not re.fullmatch(r"\d{11,12}", text):
-        raise ValueError("UPC-A content must contain 11 or 12 digits")
+    if key == "ean13":
+        if not re.fullmatch(r"\d{12,13}", text):
+            raise ValueError("EAN-13 content must contain 12 or 13 digits")
+        if len(text) == 12:
+            text += _gtin_check_digit(text)
+    if key == "upca":
+        if not re.fullmatch(r"\d{11,12}", text):
+            raise ValueError("UPC-A content must contain 11 or 12 digits")
+        if len(text) == 11:
+            text += _gtin_check_digit(text)
     if key == "code39" and not re.fullmatch(r"[0-9A-Z .$/+%-]+", text.upper()):
         raise ValueError("Code 39 supports uppercase letters, digits, spaces and . $ / + % -")
     return text.upper() if key == "code39" else text

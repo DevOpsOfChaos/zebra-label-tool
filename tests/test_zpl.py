@@ -108,3 +108,13 @@ def test_generate_datamatrix_and_pdf417_zpl():
     pdf = generate_zpl("Part", "", 57, 29, 32, barcode=True, barcode_text="PART-42", barcode_type="pdf417", barcode_height=80)
     assert "^BXN,4,200" in dm
     assert "^B7N,80" in pdf
+
+
+def test_generate_ean13_adds_check_digit_for_12_digit_payload():
+    zpl = generate_zpl("Retail", "", 57, 29, 32, barcode=True, barcode_text="400638133393", barcode_type="ean13")
+    assert "^FD4006381333931^FS" in zpl
+
+
+def test_generate_upca_adds_check_digit_for_11_digit_payload():
+    zpl = generate_zpl("Retail", "", 57, 29, 32, barcode=True, barcode_text="03600029145", barcode_type="upca")
+    assert "^FD036000291452^FS" in zpl

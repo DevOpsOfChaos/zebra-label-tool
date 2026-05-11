@@ -8,9 +8,18 @@ import tkinter as tk
 from .barcodes import BARCODE_TYPES, is_2d_barcode, normalize_barcode_type
 from .constants import COL_BORDER, COL_MUTED, COL_PANEL, PREVIEW_MAX_H, PREVIEW_MAX_W
 from .layout import MARGIN_X, calculate_layout_for_lines, normalize_text_lines
+from .preview_symbols import encode_linear_symbol, encode_matrix_symbol
 
 
 class LabelPreviewCanvas(tk.Canvas):
+    """Draw a local preview of the generated label.
+
+    Text layout uses the same shared calculation as ZPL generation. Linear
+    barcodes and QR codes are generated from real encoding patterns so the
+    preview is useful rather than decorative. Data Matrix and PDF417 are shown as
+    deterministic high-fidelity layout previews because the final printer render
+    is produced by Zebra firmware from the generated ZPL command.
+    """
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=COL_PANEL, highlightthickness=0, **kwargs)
@@ -133,6 +142,7 @@ class LabelPreviewCanvas(tk.Canvas):
                 int(offset_x),
                 barcode_type,
                 bool(barcode_show_text),
+                int(barcode_magnification or 4),
             )
 
         self.create_text(
@@ -143,64 +153,94 @@ class LabelPreviewCanvas(tk.Canvas):
             font=("Helvetica", 9),
         )
 
-    def _draw_symbol(self, ox, bar_y, lw, bar_h, color, text, scale, offset_x, barcode_type, show_text):
+    def _draw_symbol(self, ox, bar_y, lw, bar_h, color, text, scale, offset_x, barcode_type, show_text, magnification):
         if is_2d_barcode(barcode_type):
-            self._draw_2d_code(ox, bar_y, lw, bar_h, color, text, scale, offset_x, barcode_type)
+            self._draw_2d_code(ox, bar_y, lw, bar_h, color, text, scale, offset_x, barcode_type, magnification)
         else:
             self._draw_linear_barcode(ox, bar_y, lw, bar_h, color, text, scale, offset_x, barcode_type, show_text)
 
     def _draw_linear_barcode(self, ox, bar_y, lw, bar_h, color, text, scale, offset_x=0, barcode_type="code128", show_text=True):
-        margin = int((MARGIN_X + offset_x) * scale)
+        margin = max(4, int((MARGIN_X + offset_x) * scale))
         bx = ox + margin
         bw = max(8, lw - margin * 2)
-        seed = sum(ord(ch) for ch in str(text or barcode_type)) or 37
-        pattern = [1 + ((seed + i * 7) % 3) for i in range(31)]
-        total = sum(pattern)
-        unit_w = bw / total if total else 1
-        x = bx
-        for i, units in enumerate(pattern):
-            w = unit_w * units
-            if i % 2 == 0:
-                self.create_rectangle(x, bar_y, x + w, bar_y + bar_h * (0.78 if show_text else 0.92), fill=color, outline="")
+        try:
+            symbol = encode_linear_symbol(barcode_type, text)
+        except Exception as exc:
+            self.create_text(ox + lw // 2, bar_y + 4, text=f"Barcode error: {exc}", fill="#dc2626", font=("Helvetica", 10), anchor="n")
+            return
+
+        quiet = max(4, int(10 * scale))
+        draw_x = bx + quiet
+        draw_w = max(4, bw - quiet * 2)
+        total_modules = sum(width for _, width in symbol.modules) or 1
+        module_w = draw_w / total_modules
+        bar_body_h = bar_h * (0.72 if show_text else 0.88)
+
+        x = draw_x
+        for is_bar, units in symbol.modules:
+            w = units * module_w
+            if is_bar:
+                # integer-ish coordinates keep the preview crisp at normal scales
+                self.create_rectangle(round(x), bar_y, round(x + w), bar_y + bar_body_h, fill=color, outline="")
             x += w
+
         if show_text:
             self.create_text(
                 ox + lw // 2,
-                bar_y + bar_h,
-                text=text[:30] + ("..." if len(text) > 30 else ""),
+                bar_y + bar_h * 0.77,
+                text=symbol.label[:34] + ("..." if len(symbol.label) > 34 else ""),
                 fill=color,
                 font=("Courier New", max(6, int(8 * scale))),
                 anchor="n",
             )
 
-    def _draw_2d_code(self, ox, bar_y, lw, bar_h, color, text, scale, offset_x=0, barcode_type="qr"):
-        margin = int((MARGIN_X + offset_x) * scale)
-        size = min(max(22, int(bar_h * 0.86)), max(22, lw - margin * 2))
-        x0 = ox + (lw - size) // 2
+    def _draw_2d_code(self, ox, bar_y, lw, bar_h, color, text, scale, offset_x=0, barcode_type="qr", magnification=4):
+        margin = max(4, int((MARGIN_X + offset_x) * scale))
+        try:
+            symbol = encode_matrix_symbol(barcode_type, text, magnification=magnification)
+        except Exception as exc:
+            self.create_text(ox + lw // 2, bar_y + 4, text=f"2D code error: {exc}", fill="#dc2626", font=("Helvetica", 10), anchor="n")
+            return
+
+        rows = len(symbol.cells)
+        cols = len(symbol.cells[0]) if rows else 0
+        if not rows or not cols:
+            return
+
+        max_w = max(20, lw - margin * 2)
+        if barcode_type == "pdf417":
+            target_w = max_w
+            cell = min(target_w / cols, max(2, bar_h / max(rows, 1)))
+            draw_w = cols * cell
+            draw_h = rows * cell
+        else:
+            size = min(max(22, int(bar_h * 0.92)), max_w)
+            cell = size / max(cols, rows)
+            draw_w = cols * cell
+            draw_h = rows * cell
+
+        x0 = ox + (lw - draw_w) / 2
         y0 = bar_y
-        self.create_rectangle(x0, y0, x0 + size, y0 + size, outline=color, fill="")
-        cells = 9 if barcode_type == "qr" else 8
-        cell = size / cells
-        seed = sum(ord(ch) for ch in str(text or barcode_type))
-        for row in range(cells):
-            for col in range(cells):
-                finder = barcode_type == "qr" and ((row < 3 and col < 3) or (row < 3 and col >= cells - 3) or (row >= cells - 3 and col < 3))
-                filled = finder or ((row * 17 + col * 31 + seed) % 5 in {0, 2})
+        bg = "#ffffff" if color != "#ffffff" else "#111827"
+        self.create_rectangle(x0 - 2, y0 - 2, x0 + draw_w + 2, y0 + draw_h + 2, fill=bg, outline=color)
+
+        for row_index, row in enumerate(symbol.cells):
+            for col_index, filled in enumerate(row):
                 if filled:
                     self.create_rectangle(
-                        x0 + col * cell + 1,
-                        y0 + row * cell + 1,
-                        x0 + (col + 1) * cell - 1,
-                        y0 + (row + 1) * cell - 1,
+                        x0 + col_index * cell,
+                        y0 + row_index * cell,
+                        x0 + (col_index + 1) * cell,
+                        y0 + (row_index + 1) * cell,
                         fill=color,
                         outline="",
                     )
-        label = BARCODE_TYPES[normalize_barcode_type(barcode_type)].label
-        self.create_text(
-            ox + lw // 2,
-            y0 + size + 4,
-            text=label,
-            fill=COL_MUTED,
-            font=("Helvetica", max(7, int(8 * scale))),
-            anchor="n",
-        )
+        if not symbol.exact:
+            self.create_text(
+                ox + lw // 2,
+                y0 + draw_h + 4,
+                text=f"{BARCODE_TYPES[normalize_barcode_type(barcode_type)].label} preview",
+                fill=COL_MUTED,
+                font=("Helvetica", max(7, int(8 * scale))),
+                anchor="n",
+            )

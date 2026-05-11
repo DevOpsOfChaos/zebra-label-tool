@@ -28,6 +28,7 @@ classifiers = [
 ]
 dependencies = [
   "customtkinter>=5.2.0",
+  "qrcode>=8.0",
   "pywin32>=306; platform_system == 'Windows'",
 ]
 

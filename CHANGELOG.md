@@ -16,8 +16,14 @@
 - Layout quality warnings when auto-fit shrinks text, text is missing, barcode content is long, or the text-line limit is reached.
 - Test coverage for presets, text tools, batch ZPL generation, barcode validation, QR/Data Matrix/PDF417 ZPL generation, and QR import.
 
+- Real local preview patterns for Code 128, Code 39, EAN-13, UPC-A, and QR Code.
+- Deterministic layout previews for Data Matrix and PDF417 while Zebra firmware remains the final renderer.
+- Built-in preset input dialogs so barcode/QR presets can be filled before applying.
+- Additional built-in presets for Wi-Fi QR labels, part-number labels, and retail EAN labels.
+
 ### Changed
 
+- The red clear button now resets label text, selected template state, and active barcode/QR payload instead of only clearing text.
 - Enter now stays inside the multi-line editor and creates another printed label line instead of printing.
 - Printing moved to `Ctrl+P` and the **Print label** button to avoid accidental output.
 - `Ctrl+C` and `Ctrl+Z` are no longer app-level ZPL shortcuts, so normal text copy/undo behavior is preserved.

@@ -58,3 +58,13 @@ This is intentional. The main editor is multi-line, so Enter creates another pri
 ## Copy and undo shortcuts inside the text editor
 
 `Ctrl+C` and `Ctrl+Z` are left to normal text editing behavior. Generated ZPL can still be copied from **View > Show ZPL...**.
+
+## QR preview is missing or not rendered
+
+Run the current dependencies again:
+
+```powershell
+pip install -r requirements.txt
+```
+
+The local QR preview uses the `qrcode` package. The generated ZPL can still be copied/exported, but the GUI preview needs that package installed.

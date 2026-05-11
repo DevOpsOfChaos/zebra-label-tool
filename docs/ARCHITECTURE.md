@@ -16,7 +16,7 @@ These modules are covered by tests and can run on every platform.
 
 ## Workflow helpers
 
-- `presets.py` contains built-in preset definitions. Presets are plain dictionaries so they can later become user-shareable templates.
+- `presets.py` contains built-in preset definitions, fill-in field metadata, and placeholder rendering. Presets remain data-driven so they can later become user-shareable templates.
 - `text_tools.py` contains deterministic text cleanup and formatting helpers used by the GUI.
 - `batch.py` converts pasted text blocks into multiple `LabelSpec` instances and one combined ZPL stream.
 
@@ -48,3 +48,7 @@ The preview uses the same layout calculation as the ZPL generator. This prevents
 ## Import boundary
 
 `zpl_import.py` is deliberately not a full ZPL parser. It only recovers fields from the simple generated labels this project creates. Unsupported ZPL should fail softly instead of pretending to be fully editable.
+
+## Barcode and QR preview strategy
+
+ZPL output remains the source of truth for the printer. The local preview uses real encoders for Code 128, Code 39, EAN-13, UPC-A and QR Code so users see meaningful scanner-like codes instead of decorative placeholders. Data Matrix and PDF417 are still generated as real ZPL commands and shown with deterministic layout previews until a dedicated local renderer is introduced.

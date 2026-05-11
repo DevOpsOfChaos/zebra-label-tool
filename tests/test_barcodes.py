@@ -18,7 +18,9 @@ def test_normalize_barcode_type_accepts_labels_and_aliases():
 
 def test_ean_and_upc_payload_validation():
     assert validate_barcode_payload("ean13", "4006381333931") == "4006381333931"
+    assert validate_barcode_payload("ean13", "400638133393") == "4006381333931"
     assert validate_barcode_payload("upca", "036000291452") == "036000291452"
+    assert validate_barcode_payload("upca", "03600029145") == "036000291452"
     with pytest.raises(ValueError, match="EAN-13"):
         validate_barcode_payload("ean13", "ABC")
     with pytest.raises(ValueError, match="UPC-A"):

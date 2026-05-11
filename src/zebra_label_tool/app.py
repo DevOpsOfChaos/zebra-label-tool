@@ -30,7 +30,7 @@ from .constants import (
 )
 from .label_spec import LabelSpec, LabelSpecError, MAX_TEXT_LINES
 from .layout import calculate_layout_for_lines, mm_to_dots
-from .presets import BUILTIN_PRESET_NAMES, BUILTIN_PRESETS, preset_settings
+from .presets import BUILTIN_PRESETS, get_builtin_preset, render_preset_settings
 from .preview import LabelPreviewCanvas
 from .printing import get_printers, send_zpl_to_printer
 from .settings import load_settings, save_settings
@@ -129,7 +129,7 @@ class ZebraApp(ctk.CTk):
         menubar.add_cascade(label="File", menu=file_menu)
 
         edit_menu = tk.Menu(menubar, tearoff=False)
-        edit_menu.add_command(label="Clear text", command=self._clear_text)
+        edit_menu.add_command(label="Clear label content", command=self._clear_label_content)
         edit_menu.add_command(label="Use barcode text from label", command=self._barcode_from_first_line)
         edit_menu.add_separator()
         edit_menu.add_command(label="Save current settings", accelerator="Ctrl+S", command=self._save_all_settings)
@@ -285,7 +285,7 @@ class ZebraApp(ctk.CTk):
             corner_radius=8,
             fg_color=COL_ERR,
             hover_color="#991b1b",
-            command=self._clear_text,
+            command=self._clear_label_content,
         )
         self.clear_text_btn.grid(row=0, column=0, sticky="w", padx=(0, 8))
         ctk.CTkLabel(text_header, text="Label text", font=ctk.CTkFont(size=14, weight="bold"), text_color=COL_TEXT).grid(row=0, column=1, sticky="w")
@@ -821,12 +821,53 @@ class ZebraApp(ctk.CTk):
 
     def _apply_builtin_preset(self, name: str) -> None:
         try:
-            values = preset_settings(name)
+            preset = get_builtin_preset(name)
         except KeyError:
             self._status("Unknown preset", COL_ERR)
             return
-        self._apply_setting_values(values)
+        if preset.fields:
+            self._open_preset_input_dialog(name)
+            return
+        self._apply_setting_values(render_preset_settings(name))
+        self.template_var.set(self._template_names()[0])
         self._status(f"Preset applied: {name}", COL_SUCCESS)
+
+    def _open_preset_input_dialog(self, name: str) -> None:
+        try:
+            preset = get_builtin_preset(name)
+        except KeyError:
+            self._status("Unknown preset", COL_ERR)
+            return
+        height = min(640, 230 + len(preset.fields) * 66)
+        win = self._dialog(f"{preset.name} preset", 540, height)
+        frame = ctk.CTkFrame(win, fg_color=COL_PANEL)
+        frame.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
+        frame.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(frame, text=preset.name, font=ctk.CTkFont(size=16, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, columnspan=3, sticky="w", padx=10, pady=(10, 2))
+        ctk.CTkLabel(frame, text=preset.description, justify="left", wraplength=470, font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=1, column=0, columnspan=3, sticky="ew", padx=10, pady=(0, 12))
+
+        entries: dict[str, ctk.CTkEntry] = {}
+        row = 2
+        for field in preset.fields:
+            ctk.CTkLabel(frame, text=field.label).grid(row=row, column=0, sticky="w", padx=10, pady=(8, 2))
+            entry = ctk.CTkEntry(frame)
+            entry.insert(0, field.default)
+            entry.grid(row=row, column=1, columnspan=2, sticky="ew", padx=10, pady=(8, 2))
+            entries[field.key] = entry
+            row += 1
+            if field.help_text:
+                ctk.CTkLabel(frame, text=field.help_text, justify="left", wraplength=330, font=ctk.CTkFont(size=10), text_color=COL_MUTED).grid(row=row, column=1, columnspan=2, sticky="w", padx=10, pady=(0, 4))
+                row += 1
+
+        def apply() -> None:
+            field_values = {key: entry.get().strip() for key, entry in entries.items()}
+            self._apply_setting_values(render_preset_settings(name, field_values))
+            self.template_var.set(self._template_names()[0])
+            self._status(f"Preset applied: {name}", COL_SUCCESS)
+            win.destroy()
+
+        self._dialog_buttons(frame, row, apply, win.destroy)
 
     def _format_text(self, action: str) -> None:
         current = self._get_text_lines()
@@ -994,8 +1035,15 @@ class ZebraApp(ctk.CTk):
         self._update_all()
 
     def _clear_text(self) -> None:
+        self._clear_label_content()
+
+    def _clear_label_content(self) -> None:
         self._set_text_lines([""])
+        self.barcode_text_var.set("")
+        self.barcode_var.set(False)
+        self.template_var.set(self._template_names()[0])
         self._update_all()
+        self._status("Label content cleared", COL_SUCCESS)
 
     def _barcode_from_first_line(self) -> None:
         first = self._get_text_lines()[0] if self._get_text_lines() else ""

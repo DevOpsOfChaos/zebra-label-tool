@@ -34,19 +34,20 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Direct RAW printing to installed Windows printers
 - Common DPI presets: 203, 300, 600
 - Common label size shortcuts
-- Built-in presets for device labels, asset tags, QR device links, storage bins, and cable markers
+- Built-in presets for device labels, asset tags, QR device links, Wi-Fi QR labels, part numbers, retail EAN labels, storage bins, and cable markers
 - Main-window text controls for font size, alignment, and auto-fit
 - Enter in the text editor adds another printed line instead of printing accidentally
 - Advanced font style, rotation, line gap, and offset controls
 - Optional inverted label output
 - Optional border
-- Optional linear barcodes: Code 128, Code 39, EAN-13, UPC-A
-- Optional 2D codes: QR Code, Data Matrix, PDF417
+- Optional linear barcodes: Code 128, Code 39, EAN-13, UPC-A with real local preview patterns
+- Optional 2D codes: QR Code, Data Matrix, PDF417. QR preview uses a real QR matrix; Data Matrix/PDF417 are printer-rendered from ZPL and shown with deterministic layout previews.
 - Barcode/QR setup through the top menu to keep the main window clean
 - Top menu workflow for Label, Text, Barcode/QR, ZPL, text cleanup, and batch tools
 - Text cleanup actions: trim whitespace, remove empty lines, uppercase, lowercase, title case, and wrap long lines
 - Batch label ZPL generation from pasted text blocks
 - Layout quality warnings for auto-fit, empty labels, long barcodes, and line limits
+- Built-in presets with fill-in dialogs when a preset contains a barcode/QR payload
 - Templates
 - Print history
 - Safer input validation before print/copy/export
@@ -152,7 +153,8 @@ src/zebra_label_tool/
   cli.py        # command line ZPL generation
   layout.py     # pure label geometry/layout calculations
   preview.py    # canvas preview
-  presets.py    # built-in workflow presets
+  preview_symbols.py # local barcode/QR preview pattern builders
+  presets.py    # built-in workflow presets and preset input fields
   text_tools.py # editor cleanup/wrapping helpers
   label_spec.py # shared validated label request model
   printing.py   # Windows RAW printing backend
@@ -186,7 +188,7 @@ Later:
 
 - More barcode tuning options and scanner-oriented validation
 - Template sharing
-- Template variables
+- User-editable template variables
 - Better preview/rendering options
 
 ## Contributing
