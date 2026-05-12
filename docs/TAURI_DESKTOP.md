@@ -88,8 +88,8 @@ The Tauri scaffold includes `src-tauri/icons/icon.ico`, which is required for Wi
 
 ## Responsive layout
 
-The desktop client is no longer designed around a full-screen-only layout. It has compact breakpoints for medium and narrow windows, reduced default window size, and lower minimum window dimensions.
+The desktop client is no longer designed around a full-screen-only layout. It has compact breakpoints for medium and narrow windows, reduced default window size, lower minimum window dimensions, and a collapsible left sidebar so the preview can use more of the window.
 
 ## Sequence workflows
 
-The Tauri client supports numeric and letter-based sequences. Sequence barcode/QR content can use generated values, the first printed line, all printed text, or a custom payload template such as `asset:{value}` or `rack-{value}-{index}`.
+The Tauri client supports numeric, letter-based, and mixed letter/number sequences. Sequence barcode/QR content can use generated values, the first printed line, all printed text, or a custom payload template such as `asset:{value}`, `rack-{letter}-{number:000}`, or `asset:{value}-{index}`.

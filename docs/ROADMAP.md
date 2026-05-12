@@ -71,6 +71,7 @@ Next layout improvements:
 - visual drag handles for text/code areas,
 - per-area margins,
 - optional fixed QR size in millimetres,
+- user-reviewed compact Tauri layout defaults,
 - better Data Matrix/PDF417 local rendering,
 - reusable user-defined label composition templates.
 
@@ -82,3 +83,9 @@ Next layout improvements:
 - Add parity tests between TypeScript ZPL output and Python ZPL output for core examples.
 - Decide whether production packaging should bundle Python, call an installed Python package, or move printing into Rust.
 - Replace or retire the Tkinter UI only after the Tauri workflow is manually validated.
+
+## Tauri client follow-up
+
+- Replace the temporary generated icon with a polished project logo before the first public packaged release.
+- Add visual screenshot documentation once the responsive desktop layout is manually reviewed on Windows.
+- Consider code-splitting `bwip-js` if the packaged frontend bundle becomes too large.

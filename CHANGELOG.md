@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added collapsible Tauri sidebar to give the preview more room on normal laptop screens.
+- Added centered code placement and quick S/M/L/XL code-size controls in the Tauri client.
+- Added mixed letter/number sequence patterns such as `{letter}-{number}` and `{number:000}` for printed text and QR/barcode payload templates.
 - Fixed Python QR preview tests so a missing optional `qrcode` install no longer crashes the test suite; the preview now falls back to a deterministic QR-like matrix.
 - Added environment doctor commands for Python and Tauri prerequisite checks.
 - Added an experimental modern Tauri desktop client under `desktop/`.

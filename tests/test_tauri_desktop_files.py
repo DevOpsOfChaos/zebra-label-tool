@@ -68,14 +68,18 @@ def test_tauri_frontend_has_responsive_sequence_workflow() -> None:
     main_ts = (DESKTOP / "src" / "main.ts").read_text(encoding="utf-8")
     zpl_ts = (DESKTOP / "src" / "zpl.ts").read_text(encoding="utf-8")
     css = (DESKTOP / "src" / "styles.css").read_text(encoding="utf-8")
-    assert "SequenceKind = 'number' | 'letters'" in domain
+    assert "SequenceKind = 'number' | 'letters' | 'mixed'" in domain
     assert "barcodeTemplate" in domain
     assert 'data-seq-preset="letters"' in main_ts
     assert "letterStart" in main_ts
+    assert "valuePattern" in main_ts
+    assert "data-code-center" in main_ts
+    assert "sidebarCollapsed" in main_ts
     assert "lettersToIndex" in zpl_ts
     assert "payloadForSequence" in zpl_ts
-    assert "@media (max-width: 920px)" in css
+    assert "@media (max-width: 900px)" in css
     assert "@media (max-width: 620px)" in css
+    assert "nav-collapsed" in css
 
 
 def test_tauri_package_has_doctor_script() -> None:
@@ -84,3 +88,14 @@ def test_tauri_package_has_doctor_script() -> None:
     script = (DESKTOP / "scripts" / "check-prereqs.mjs").read_text(encoding="utf-8")
     assert "cargo" in script
     assert "icon.ico" in script
+
+
+def test_tauri_frontend_supports_centered_codes_and_mixed_sequence_tokens() -> None:
+    domain = (DESKTOP / "src" / "domain.ts").read_text(encoding="utf-8")
+    zpl_ts = (DESKTOP / "src" / "zpl.ts").read_text(encoding="utf-8")
+    main_ts = (DESKTOP / "src" / "main.ts").read_text(encoding="utf-8")
+    assert "'center'" in domain
+    assert "barW" in zpl_ts
+    assert "replaceSequenceTokens" in zpl_ts
+    assert "{number:000}" in main_ts or "sequenceTokenHelp" in main_ts
+    assert 'data-seq-preset="mixed"' in main_ts

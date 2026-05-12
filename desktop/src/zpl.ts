@@ -1,4 +1,4 @@
-import type { Alignment, AppState, BarcodeMode, BarcodeType, CodePosition } from './domain';
+import type { Alignment, AppState, BarcodeMode, BarcodeType, CodePosition, SequenceState } from './domain';
 
 export interface LabelSpec {
   lines: string[];
@@ -19,6 +19,14 @@ export interface LabelSpec {
   barcodeArea: number;
   barcodeMagnification: number;
   showBarcodeText: boolean;
+}
+
+export interface SequenceValue {
+  value: string;
+  raw: number;
+  index: number;
+  number: string;
+  letter: string;
 }
 
 export function mmToDots(mm: number, dpi: number): number {
@@ -56,52 +64,59 @@ function codeHeight(spec: LabelSpec): number {
 export function calculateLayout(spec: LabelSpec) {
   const pw = Math.max(1, mmToDots(spec.widthMm, spec.dpi));
   const ll = Math.max(1, mmToDots(spec.heightMm, spec.dpi));
-  const margin = 20;
-  const gap = 14;
+  const margin = 16;
+  const gap = 10;
   const codeActive = spec.barcode && spec.barcodeText.trim().length > 0;
   const barH = codeHeight(spec);
+  const barW = Math.min(Math.max(barH, Math.round(spec.barcodeArea)), Math.max(32, pw - margin * 2));
   let textX = margin;
   let textY = 4;
   let textW = Math.max(1, pw - margin * 2);
-  let barX = margin;
-  let barY = 4;
+  let barX = Math.round((pw - barW) / 2);
+  let barY = Math.round((ll - barH) / 2);
 
-  const lineCount = Math.max(1, spec.lines.length);
+  const visibleLines = spec.lines.filter((line) => line.trim().length > 0);
+  const lineCount = Math.max(1, visibleLines.length || spec.lines.length);
   let fs = Math.max(8, Math.round(spec.fontSize));
   if (spec.autoFit) {
     const longest = Math.max(...spec.lines.map((line) => line.length), 1);
     const maxChars = spec.barcodePosition === 'left' || spec.barcodePosition === 'right' ? 18 : 28;
     if (longest > maxChars) fs = Math.max(8, Math.floor((fs * maxChars) / longest));
   }
-  const textH = fs * lineCount + Math.max(0, spec.lineGap) * Math.max(0, lineCount - 1);
+  const hasVisibleText = visibleLines.length > 0;
+  const textH = hasVisibleText ? fs * lineCount + Math.max(0, spec.lineGap) * Math.max(0, lineCount - 1) : 0;
 
   if (!codeActive) {
     textY = Math.max(4, Math.round((ll - textH) / 2));
   } else if (spec.barcodePosition === 'right') {
-    const codeW = Math.min(Math.max(barH, Math.round(spec.barcodeArea)), Math.max(40, pw - margin * 3));
-    textW = Math.max(1, pw - margin * 3 - codeW - gap);
+    textW = Math.max(1, pw - margin * 2 - barW - gap);
     textX = margin;
     textY = Math.max(4, Math.round((ll - textH) / 2));
     barX = margin + textW + gap;
     barY = Math.max(2, Math.round((ll - barH) / 2));
   } else if (spec.barcodePosition === 'left') {
-    const codeW = Math.min(Math.max(barH, Math.round(spec.barcodeArea)), Math.max(40, pw - margin * 3));
     barX = margin;
     barY = Math.max(2, Math.round((ll - barH) / 2));
-    textX = margin + codeW + gap;
+    textX = margin + barW + gap;
     textW = Math.max(1, pw - textX - margin);
     textY = Math.max(4, Math.round((ll - textH) / 2));
+  } else if (spec.barcodePosition === 'center') {
+    barX = Math.max(2, Math.round((pw - barW) / 2));
+    barY = Math.max(2, Math.round((ll - barH - (hasVisibleText ? gap + textH : 0)) / 2));
+    textX = margin;
+    textW = Math.max(1, pw - margin * 2);
+    textY = Math.min(Math.max(4, barY + barH + gap), Math.max(4, ll - textH - 4));
   } else if (spec.barcodePosition === 'above') {
-    barX = margin;
+    barX = Math.max(2, Math.round((pw - barW) / 2));
     barY = 4;
     textY = Math.max(barY + barH + gap, Math.round((ll - textH) / 2));
   } else {
     textY = Math.max(4, Math.round((ll - barH - gap - textH) / 2));
-    barX = margin;
+    barX = Math.max(2, Math.round((pw - barW) / 2));
     barY = Math.min(Math.max(2, textY + textH + gap), Math.max(2, ll - barH - 4));
   }
 
-  return { pw, ll, margin, fs, textX, textY, textW, barX, barY, barH };
+  return { pw, ll, margin, fs, textX, textY, textW, barX, barY, barH, barW };
 }
 
 function barcodeLines(spec: LabelSpec, x: number, y: number, h: number): string[] {
@@ -149,19 +164,100 @@ export function generateZpl(spec: LabelSpec): string {
   return zpl.join('\n');
 }
 
-export function buildSpec(state: AppState, sequenceValue?: string, rawNumber = state.sequence.start, sequenceIndex = 0): LabelSpec {
+function normalizeLetters(value: string): string {
+  return String(value || 'A').replace(/[^a-z]/gi, '').toUpperCase() || 'A';
+}
+
+export function lettersToIndex(value: string): number {
+  return normalizeLetters(value).split('').reduce((acc, char) => acc * 26 + (char.charCodeAt(0) - 64), 0);
+}
+
+export function indexToLetters(index: number): string {
+  let n = Math.max(1, Math.round(index));
+  let out = '';
+  while (n > 0) {
+    n -= 1;
+    out = String.fromCharCode(65 + (n % 26)) + out;
+    n = Math.floor(n / 26);
+  }
+  return out;
+}
+
+export function formatNumberValue(raw: number, padding: number, prefix: string, suffix: string): string {
+  const sign = raw < 0 ? '-' : '';
+  return `${prefix}${sign}${Math.abs(Math.round(raw)).toString().padStart(Math.max(0, padding), '0')}${suffix}`;
+}
+
+function paddedNumber(raw: number, padding: number): string {
+  const sign = raw < 0 ? '-' : '';
+  return `${sign}${Math.abs(Math.round(raw)).toString().padStart(Math.max(0, padding), '0')}`;
+}
+
+function replaceSequenceTokens(template: string, item: SequenceValue): string {
+  return String(template || '{value}')
+    .replace(/\{(?:n|number)(?::(0+|\d+))?\}/g, (_match, width: string | undefined) => {
+      if (!width) return item.number;
+      const digits = /^0+$/.test(width) ? width.length : Number(width);
+      return paddedNumber(item.raw, Number.isFinite(digits) ? Number(digits) : 0);
+    })
+    .replaceAll('{value}', item.value)
+    .replaceAll('{seq}', item.value)
+    .replaceAll('{letter}', item.letter)
+    .replaceAll('{letters}', item.letter)
+    .replaceAll('{raw}', String(item.raw))
+    .replaceAll('{index}', String(item.index + 1))
+    .replaceAll('{index0}', String(item.index));
+}
+
+export function formatSequenceItem(sequence: SequenceState, index: number): SequenceValue {
+  const raw = sequence.start + index * sequence.step;
+  const letterRaw = lettersToIndex(sequence.letterStart) + index * sequence.step;
+  const number = paddedNumber(raw, sequence.padding);
+  const letter = indexToLetters(letterRaw);
+  if (sequence.kind === 'letters') {
+    return { value: `${sequence.prefix}${letter}${sequence.suffix}`, raw: letterRaw, index, number, letter };
+  }
+  if (sequence.kind === 'mixed') {
+    const item = { value: '', raw, index, number, letter };
+    const core = replaceSequenceTokens(sequence.valuePattern || '{letter}-{number}', item);
+    return { value: `${sequence.prefix}${core}${sequence.suffix}`, raw, index, number, letter };
+  }
+  return { value: formatNumberValue(raw, sequence.padding, sequence.prefix, sequence.suffix), raw, index, number, letter };
+}
+
+export function renderSequenceTemplate(template: string, item: SequenceValue): string {
+  return replaceSequenceTokens(template || '{value}', item);
+}
+
+export function sequenceItems(state: AppState): SequenceValue[] {
+  return Array.from({ length: Math.max(1, Math.min(500, Math.round(state.sequence.count))) }, (_, index) =>
+    formatSequenceItem(state.sequence, index),
+  );
+}
+
+export function sequenceValues(state: AppState): string[] {
+  return sequenceItems(state).map((item) => item.value);
+}
+
+function payloadForSequence(mode: BarcodeMode, item: SequenceValue, lines: string[], template: string): string {
+  if (mode === 'value') return item.value;
+  if (mode === 'first_line') return lines.find((line) => line.trim()) ?? item.value;
+  if (mode === 'all_text') return lines.filter((line) => line.trim()).join(' | ') || item.value;
+  if (mode === 'template') return renderSequenceTemplate(template || '{value}', item);
+  return '';
+}
+
+export function buildSpec(state: AppState, item: SequenceValue = sequenceItems(state)[0]): LabelSpec {
   const mode = state.mode;
   const sequenceActive = mode === 'sequence' || mode === 'sequence_code';
   const codeActive = mode === 'text_code' || mode === 'code' || mode === 'sequence_code';
   let text = state.text;
-  if (mode === 'code') text = state.caption;
-  if (sequenceActive) {
-    text = renderSequenceTemplate(state.sequence.template, sequenceValue ?? formatSequenceValue(rawNumber, state.sequence.padding, state.sequence.prefix, state.sequence.suffix), rawNumber, sequenceIndex);
-  }
+  if (mode === 'code') text = '';
+  if (sequenceActive) text = renderSequenceTemplate(state.sequence.template, item);
   const lines = cleanLines(text);
   let barcodeText = codeActive ? state.codeContent : '';
   if (mode === 'sequence_code') {
-    barcodeText = payloadForSequence(state.sequence.barcodeMode, sequenceValue ?? '', lines);
+    barcodeText = payloadForSequence(state.sequence.barcodeMode, item, lines, state.sequence.barcodeTemplate);
   }
   return {
     lines,
@@ -185,41 +281,10 @@ export function buildSpec(state: AppState, sequenceValue?: string, rawNumber = s
   };
 }
 
-export function formatSequenceValue(raw: number, padding: number, prefix: string, suffix: string): string {
-  const sign = raw < 0 ? '-' : '';
-  return `${prefix}${sign}${Math.abs(Math.round(raw)).toString().padStart(Math.max(0, padding), '0')}${suffix}`;
-}
-
-export function renderSequenceTemplate(template: string, value: string, raw: number, index: number): string {
-  return String(template || '{value}')
-    .replaceAll('{value}', value)
-    .replaceAll('{number}', value)
-    .replaceAll('{raw}', String(raw))
-    .replaceAll('{index}', String(index + 1))
-    .replaceAll('{index0}', String(index));
-}
-
-export function sequenceValues(state: AppState): string[] {
-  return Array.from({ length: Math.max(1, Math.min(500, Math.round(state.sequence.count))) }, (_, index) => {
-    const raw = state.sequence.start + index * state.sequence.step;
-    return formatSequenceValue(raw, state.sequence.padding, state.sequence.prefix, state.sequence.suffix);
-  });
-}
-
-function payloadForSequence(mode: BarcodeMode, value: string, lines: string[]): string {
-  if (mode === 'value') return value;
-  if (mode === 'first_line') return lines.find((line) => line.trim()) ?? value;
-  if (mode === 'all_text') return lines.filter((line) => line.trim()).join(' | ') || value;
-  return '';
-}
-
 export function generateOutputZpl(state: AppState): string {
   if (state.mode === 'sequence' || state.mode === 'sequence_code') {
-    return sequenceValues(state)
-      .map((value, index) => {
-        const raw = state.sequence.start + index * state.sequence.step;
-        return generateZpl(buildSpec(state, value, raw, index));
-      })
+    return sequenceItems(state)
+      .map((item) => generateZpl(buildSpec(state, item)))
       .join('\n');
   }
   if (state.mode === 'batch') {

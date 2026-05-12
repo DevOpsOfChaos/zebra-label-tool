@@ -48,7 +48,7 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Optional linear barcodes: Code 128, Code 39, EAN-13, UPC-A with real local preview patterns
 - Optional 2D codes: QR Code, Data Matrix, PDF417. QR preview uses a real QR matrix when `qrcode` is installed and falls back to a deterministic preview in partially prepared dev environments; Data Matrix/PDF417 are printer-rendered from ZPL and shown with deterministic layout previews.
 - Barcode/QR setup through the top menu to keep the main window clean
-- Side-by-side label layouts: place barcode/QR/Data Matrix/PDF417 code areas above, below, left, or right of the text
+- Side-by-side label layouts: place barcode/QR/Data Matrix/PDF417 code areas above, below, left, right, or centered on the label
 - Top menu workflow for Label, Text, Barcode/QR, ZPL, text cleanup, batch tools, and numbered label series
 - Text cleanup actions: trim whitespace, remove empty lines, uppercase, lowercase, title case, and wrap long lines
 - Batch label ZPL generation from pasted text blocks
@@ -263,4 +263,4 @@ npm install
 npm run tauri dev
 ```
 
-The Tauri client supports text labels, text + code labels, code-only labels, numeric sequences, letter sequences, sequence-specific QR/barcode payloads, and batch ZPL export.
+The Tauri client supports text labels, text + code labels, code-only labels, numeric sequences, letter sequences, mixed letter/number sequences, sequence-specific QR/barcode payload templates, centered QR/code placement, and batch ZPL export.

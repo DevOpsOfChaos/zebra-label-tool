@@ -6,6 +6,7 @@ import {
   barcodeOrder,
   modeOrder,
   positionOrder,
+  sequenceKindOrder,
   type AppState,
   type BarcodeMode,
   type BarcodeType,
@@ -22,6 +23,7 @@ const storageKey = 'zebra-label-tool.tauri.state';
 const defaultState: AppState = {
   language: (navigator.language || '').toLowerCase().startsWith('de') ? 'de' : 'en',
   theme: 'light',
+  sidebarCollapsed: false,
   mode: 'text_code',
   printer: '',
   printers: [],
@@ -45,7 +47,9 @@ const defaultState: AppState = {
   codeMagnification: 5,
   showBarcodeText: true,
   sequence: {
+    kind: 'number',
     start: 1,
+    letterStart: 'A',
     count: 10,
     step: 1,
     padding: 3,
@@ -53,6 +57,8 @@ const defaultState: AppState = {
     suffix: '',
     template: 'Asset {value}\nRack A',
     barcodeMode: 'value',
+    barcodeTemplate: 'asset:{value}',
+    valuePattern: '{letter}-{number}',
   },
   batchText: 'Shelf A\nBox 01\n\nShelf A\nBox 02',
 };
@@ -109,7 +115,7 @@ function modeDescription(mode: WorkflowMode): string {
   const de: Record<WorkflowMode, string> = {
     text: 'Schnelle Textetiketten ohne Code-Ballast.',
     text_code: 'Normaler Alltagsmodus für Text plus Barcode oder QR-Code.',
-    code: 'Ein Code steht im Mittelpunkt, optional mit kurzer Beschriftung.',
+    code: 'Ein Barcode oder QR-Code ohne zusätzlichen Text.',
     sequence: 'Fortlaufende Nummern, Asset-Tags oder Kabelmarkierungen.',
     sequence_code: 'Fortlaufende Nummern mit Barcode oder QR-Code pro Etikett.',
     batch: 'Mehrere unterschiedliche Etiketten aus Textblöcken erzeugen.',
@@ -117,7 +123,7 @@ function modeDescription(mode: WorkflowMode): string {
   const en: Record<WorkflowMode, string> = {
     text: 'Fast text labels without code-related controls.',
     text_code: 'Default daily workflow for text plus barcode or QR code.',
-    code: 'A code is the primary content, optionally with a short caption.',
+    code: 'A barcode or QR code without additional text.',
     sequence: 'Numbered asset tags, cable markers and serial labels.',
     sequence_code: 'Numbered labels with a barcode or QR code per label.',
     batch: 'Generate multiple different labels from text blocks.',
@@ -130,20 +136,23 @@ function render(): void {
   const app = document.getElementById('app');
   if (!app) return;
   app.innerHTML = `
-    <main class="app-shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <h1>${t(state.language, 'appTitle')}</h1>
-          <p>${t(state.language, 'appSubtitle')}</p>
+    <main class="app-shell ${state.sidebarCollapsed ? 'nav-collapsed' : ''}">
+      <aside class="sidebar ${state.sidebarCollapsed ? 'collapsed' : ''}">
+        <div class="brand-row">
+          <div class="brand">
+            <h1>${t(state.language, 'appTitle')}</h1>
+            <p>${t(state.language, 'appSubtitle')}</p>
+          </div>
+          <button class="button icon-button" id="toggleSidebarBtn" title="${t(state.language, 'toggleSidebar')}">${state.sidebarCollapsed ? '›' : '‹'}</button>
         </div>
         <div class="mode-list" aria-label="${t(state.language, 'mode')}">
           ${modeOrder.map(modeButton).join('')}
         </div>
-        <div class="settings-stack">
+        ${state.sidebarCollapsed ? '' : `<div class="settings-stack">
           ${renderPrinterSettings()}
           ${renderLabelSettings()}
           ${renderAppSettings()}
-        </div>
+        </div>`}
       </aside>
       <section class="workspace">
         <div class="toolbar">
@@ -184,7 +193,7 @@ function render(): void {
 
 function modeButton(mode: WorkflowMode): string {
   return `
-    <button class="mode-button ${state.mode === mode ? 'active' : ''}" data-mode="${mode}">
+    <button class="mode-button ${state.mode === mode ? 'active' : ''}" data-mode="${mode}" title="${modeLabel(state.language, mode)}">
       <strong>${modeLabel(state.language, mode)}</strong>
       <small>${modeDescription(mode)}</small>
     </button>
@@ -241,16 +250,15 @@ function renderAppSettings(): string {
 }
 
 function renderTextPanel(): string {
-  const visible = state.mode === 'text' || state.mode === 'text_code' || state.mode === 'code' || state.mode === 'sequence' || state.mode === 'sequence_code';
+  const visible = state.mode === 'text' || state.mode === 'text_code' || state.mode === 'sequence' || state.mode === 'sequence_code';
   if (!visible) return '';
-  const isCodeOnly = state.mode === 'code';
   return `
     <section class="card-panel">
       <div>
-        <h3>${isCodeOnly ? t(state.language, 'caption') : t(state.language, 'labelText')}</h3>
+        <h3>${t(state.language, 'labelText')}</h3>
         <p class="help">${t(state.language, 'labelTextHelp')}</p>
       </div>
-      <textarea id="textInput" spellcheck="false">${escapeHtml(isCodeOnly ? state.caption : state.text)}</textarea>
+      <textarea id="textInput" spellcheck="false">${escapeHtml(state.text)}</textarea>
       <div class="grid-3">
         ${numberField('fontSize', 'Font', state.fontSize, 8, 160)}
         ${numberField('lineGap', 'Line gap', state.lineGap, 0, 80)}
@@ -274,14 +282,22 @@ function renderCodePanel(): string {
   return `
     <section class="card-panel">
       <h3>${t(state.language, 'codeSection')}</h3>
-      <div class="grid-2">
+      <p class="help">${t(state.language, 'codeHelp')}</p>
+      <div class="grid-2 compact-grid">
         <div class="field"><label>${t(state.language, 'codeType')}</label><select id="codeType">${barcodeOrder.map((type) => `<option value="${type}" ${state.codeType === type ? 'selected' : ''}>${barcodeLabels[type]}</option>`).join('')}</select></div>
         <div class="field"><label>${t(state.language, 'codePosition')}</label><select id="codePosition">${positionOrder.map((pos) => `<option value="${pos}" ${state.codePosition === pos ? 'selected' : ''}>${t(state.language, pos)}</option>`).join('')}</select></div>
-        ${numberField('codeArea', t(state.language, 'codeArea'), state.codeArea, 30, 260)}
-        ${numberField('codeMagnification', t(state.language, 'magnification'), state.codeMagnification, 1, 10)}
+        ${numberField('codeArea', t(state.language, 'codeArea'), state.codeArea, 30, 320)}
+        ${numberField('codeMagnification', t(state.language, 'magnification'), state.codeMagnification, 1, 12)}
+      </div>
+      <div class="pill-row compact-pills" aria-label="${t(state.language, 'codeSize')}">
+        <span class="inline-label">${t(state.language, 'codeSize')}</span>
+        <button class="pill" data-code-size="small">S</button>
+        <button class="pill" data-code-size="medium">M</button>
+        <button class="pill" data-code-size="large">L</button>
+        <button class="pill" data-code-size="xl">XL</button>
+        <button class="pill ${state.codePosition === 'center' ? 'active' : ''}" data-code-center="1">${t(state.language, 'centerCode')}</button>
       </div>
       ${state.mode !== 'sequence_code' ? `<div class="field"><label>${t(state.language, 'codeContent')}</label><input class="input" id="codeContent" value="${escapeAttr(state.codeContent)}"></div>` : ''}
-      ${state.mode === 'sequence_code' ? `<div class="field"><label>${t(state.language, 'barcodeMode')}</label><select id="barcodeMode"><option value="value" ${state.sequence.barcodeMode === 'value' ? 'selected' : ''}>${t(state.language, 'value')}</option><option value="first_line" ${state.sequence.barcodeMode === 'first_line' ? 'selected' : ''}>${t(state.language, 'first_line')}</option><option value="all_text" ${state.sequence.barcodeMode === 'all_text' ? 'selected' : ''}>${t(state.language, 'all_text')}</option></select></div>` : ''}
       <div class="checkbox-row"><label><input id="showBarcodeText" type="checkbox" ${state.showBarcodeText ? 'checked' : ''}> ${t(state.language, 'humanText')}</label></div>
     </section>
   `;
@@ -293,18 +309,25 @@ function renderSequencePanel(): string {
   return `
     <section class="card-panel">
       <h3>${t(state.language, 'sequenceSettings')}</h3>
-      <div class="grid-3">
-        ${numberField('seqStart', t(state.language, 'start'), state.sequence.start, -999999, 999999)}
+      <div class="grid-3 compact-grid">
+        <div class="field"><label>${t(state.language, 'sequenceKind')}</label><select id="seqKind">${sequenceKindOrder.map((kind) => `<option value="${kind}" ${state.sequence.kind === kind ? 'selected' : ''}>${kind === 'letters' ? t(state.language, 'letterSequence') : kind === 'mixed' ? t(state.language, 'mixedSequence') : t(state.language, 'numberSequence')}</option>`).join('')}</select></div>
+        ${state.sequence.kind !== 'letters' ? numberField('seqStart', t(state.language, 'start'), state.sequence.start, -999999, 999999) : ''}
+        ${state.sequence.kind !== 'number' ? `<div class="field"><label>${t(state.language, 'letterStart')}</label><input class="input" id="seqLetterStart" value="${escapeAttr(state.sequence.letterStart)}"></div>` : ''}
         ${numberField('seqCount', t(state.language, 'count'), state.sequence.count, 1, 500)}
         ${numberField('seqStep', t(state.language, 'step'), state.sequence.step, -9999, 9999)}
-        ${numberField('seqPadding', t(state.language, 'padding'), state.sequence.padding, 0, 12)}
+        ${state.sequence.kind !== 'letters' ? numberField('seqPadding', t(state.language, 'padding'), state.sequence.padding, 0, 12) : ''}
         <div class="field"><label>${t(state.language, 'prefix')}</label><input class="input" id="seqPrefix" value="${escapeAttr(state.sequence.prefix)}"></div>
         <div class="field"><label>${t(state.language, 'suffix')}</label><input class="input" id="seqSuffix" value="${escapeAttr(state.sequence.suffix)}"></div>
       </div>
-      <div class="field"><label>${t(state.language, 'template')}</label><textarea id="seqTemplate">${escapeHtml(state.sequence.template)}</textarea></div>
-      <div class="pill-row">
+      ${state.sequence.kind === 'mixed' ? `<div class="field"><label>${t(state.language, 'valuePattern')}</label><input class="input" id="seqValuePattern" value="${escapeAttr(state.sequence.valuePattern)}"><p class="help">${t(state.language, 'sequenceTokenHelp')}</p></div>` : ''}
+      <div class="field"><label>${t(state.language, 'template')}</label><textarea id="seqTemplate">${escapeHtml(state.sequence.template)}</textarea><p class="help">${t(state.language, 'sequenceTokenHelp')}</p></div>
+      ${state.mode === 'sequence_code' ? `<div class="grid-2 compact-grid"><div class="field"><label>${t(state.language, 'barcodeMode')}</label><select id="barcodeMode"><option value="value" ${state.sequence.barcodeMode === 'value' ? 'selected' : ''}>${t(state.language, 'value')}</option><option value="first_line" ${state.sequence.barcodeMode === 'first_line' ? 'selected' : ''}>${t(state.language, 'first_line')}</option><option value="all_text" ${state.sequence.barcodeMode === 'all_text' ? 'selected' : ''}>${t(state.language, 'all_text')}</option><option value="template" ${state.sequence.barcodeMode === 'template' ? 'selected' : ''}>${t(state.language, 'templateMode')}</option></select></div><div class="field"><label>${t(state.language, 'barcodeTemplate')}</label><input class="input" id="seqBarcodeTemplate" value="${escapeAttr(state.sequence.barcodeTemplate)}"><p class="help">${t(state.language, 'sequenceTokenHelp')}</p></div></div>` : ''}
+      <div class="pill-row" aria-label="${t(state.language, 'sequencePresets')}">
         <button class="pill" data-seq-preset="001">001, 002, 003</button>
         <button class="pill" data-seq-preset="asset">AS-0001</button>
+        <button class="pill" data-seq-preset="letters">A, B, C</button>
+        <button class="pill" data-seq-preset="rack">Rack-A</button>
+        <button class="pill" data-seq-preset="mixed">A-001</button>
         <button class="pill" data-seq-preset="cable">Cable 01</button>
         <button class="pill" data-seq-preset="year">2026-0001</button>
       </div>
@@ -332,15 +355,15 @@ function selected(actual: number, expected: number): string {
 }
 
 function renderPreviewLabel(): string {
-  const spec = buildSpec(state, sequenceValues(state)[0], state.sequence.start, 0);
+  const spec = buildSpec(state);
   const layout = calculateLayout(spec);
-  const maxW = 450;
-  const maxH = 300;
-  const scale = Math.min(maxW / layout.pw, maxH / layout.ll, 1.7);
+  const maxW = state.sidebarCollapsed ? 520 : 390;
+  const maxH = state.sidebarCollapsed ? 320 : 250;
+  const scale = Math.min(maxW / layout.pw, maxH / layout.ll, 1.45);
   const w = Math.max(80, Math.round(layout.pw * scale));
   const h = Math.max(40, Math.round(layout.ll * scale));
   const textStyle = `left:${layout.textX * scale}px;top:${layout.textY * scale}px;width:${layout.textW * scale}px;font-size:${Math.max(9, layout.fs * scale)}px;position:absolute;`;
-  const codeStyle = `left:${layout.barX * scale}px;top:${layout.barY * scale}px;width:${Math.max(30, layout.barH * scale)}px;height:${Math.max(30, layout.barH * scale)}px;position:absolute;`;
+  const codeStyle = `left:${layout.barX * scale}px;top:${layout.barY * scale}px;width:${Math.max(30, layout.barW * scale)}px;height:${Math.max(30, layout.barH * scale)}px;position:absolute;`;
   return `
     <div class="label-preview ${spec.inverted ? 'inverted' : ''}" style="width:${w}px;height:${h}px">
       ${spec.border ? '<div class="label-border"></div>' : ''}
@@ -353,7 +376,7 @@ function renderPreviewLabel(): string {
 function renderBarcodeCanvas(): void {
   const canvas = document.getElementById('codeCanvas') as HTMLCanvasElement | null;
   if (!canvas) return;
-  const spec = buildSpec(state, sequenceValues(state)[0], state.sequence.start, 0);
+  const spec = buildSpec(state);
   const bcid = mapBarcodeType(spec.barcodeType);
   try {
     bwipjs.toCanvas(canvas, {
@@ -398,7 +421,7 @@ function bindEvents(): void {
   bindInput('copies', () => setState({ copies: clamp(numberValue('copies', state.copies), 1, 999) }));
   bindInput('border', () => setState({ border: boolValue('border') }));
   bindInput('inverted', () => setState({ inverted: boolValue('inverted') }));
-  bindInput('textInput', () => state.mode === 'code' ? setState({ caption: stringValue('textInput') }) : setState({ text: stringValue('textInput') }));
+  bindInput('textInput', () => setState({ text: stringValue('textInput') }));
   bindInput('fontSize', () => setState({ fontSize: clamp(numberValue('fontSize', state.fontSize), 8, 160) }));
   bindInput('lineGap', () => setState({ lineGap: clamp(numberValue('lineGap', state.lineGap), 0, 80) }));
   bindInput('alignment', () => setState({ alignment: stringValue('alignment', 'center') as AppState['alignment'] }));
@@ -409,8 +432,12 @@ function bindEvents(): void {
   bindInput('codeMagnification', () => setState({ codeMagnification: clamp(numberValue('codeMagnification', state.codeMagnification), 1, 10) }));
   bindInput('codeContent', () => setState({ codeContent: stringValue('codeContent') }));
   bindInput('barcodeMode', () => setSequence('barcodeMode', stringValue('barcodeMode', 'value') as BarcodeMode));
+  bindInput('seqBarcodeTemplate', () => setSequence('barcodeTemplate', stringValue('seqBarcodeTemplate', state.sequence.barcodeTemplate)));
+  bindInput('seqValuePattern', () => setSequence('valuePattern', stringValue('seqValuePattern', state.sequence.valuePattern)));
   bindInput('showBarcodeText', () => setState({ showBarcodeText: boolValue('showBarcodeText') }));
+  bindInput('seqKind', () => setSequence('kind', stringValue('seqKind', 'number') as AppState['sequence']['kind']));
   bindInput('seqStart', () => setSequence('start', numberValue('seqStart', state.sequence.start)));
+  bindInput('seqLetterStart', () => setSequence('letterStart', stringValue('seqLetterStart', state.sequence.letterStart).toUpperCase()));
   bindInput('seqCount', () => setSequence('count', clamp(numberValue('seqCount', state.sequence.count), 1, 500)));
   bindInput('seqStep', () => setSequence('step', numberValue('seqStep', state.sequence.step) || 1));
   bindInput('seqPadding', () => setSequence('padding', clamp(numberValue('seqPadding', state.sequence.padding), 0, 12)));
@@ -419,6 +446,7 @@ function bindEvents(): void {
   bindInput('seqTemplate', () => setSequence('template', stringValue('seqTemplate')));
   bindInput('batchText', () => setState({ batchText: stringValue('batchText') }));
 
+  click('toggleSidebarBtn', () => setState({ sidebarCollapsed: !state.sidebarCollapsed }));
   click('refreshPrintersBtn', () => void refreshPrinters());
   click('refreshPreviewBtn', () => render());
   click('copyZplBtn', () => void copyZpl());
@@ -429,6 +457,12 @@ function bindEvents(): void {
   click('upperBtn', () => updateText((text) => text.toUpperCase()));
   click('lowerBtn', () => updateText((text) => text.toLowerCase()));
   click('titleBtn', () => updateText((text) => text.toLowerCase().replace(/\b\p{L}/gu, (char) => char.toUpperCase())));
+  document.querySelectorAll<HTMLButtonElement>('[data-code-size]').forEach((button) => {
+    button.addEventListener('click', () => applyCodeSize(button.dataset.codeSize ?? 'medium'));
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-code-center]').forEach((button) => {
+    button.addEventListener('click', () => setState({ codePosition: 'center' }));
+  });
   document.querySelectorAll<HTMLButtonElement>('[data-seq-preset]').forEach((button) => {
     button.addEventListener('click', () => applySequencePreset(button.dataset.seqPreset ?? '001'));
   });
@@ -446,19 +480,34 @@ function click(id: string, handler: () => void): void {
 }
 
 function updateText(fn: (text: string) => string): void {
-  if (state.mode === 'code') setState({ caption: fn(state.caption) });
-  else setState({ text: fn(state.text) });
+  setState({ text: fn(state.text) });
+}
+
+function applyCodeSize(size: string): void {
+  const presets: Record<string, Pick<AppState, 'codeArea' | 'codeMagnification'>> = {
+    small: { codeArea: 70, codeMagnification: 3 },
+    medium: { codeArea: 110, codeMagnification: 5 },
+    large: { codeArea: 160, codeMagnification: 7 },
+    xl: { codeArea: 220, codeMagnification: 9 },
+  };
+  setState(presets[size] ?? presets.medium);
 }
 
 function applySequencePreset(name: string): void {
   if (name === 'asset') {
-    state.sequence = { ...state.sequence, start: 1, padding: 4, prefix: 'AS-', suffix: '', template: 'Asset {value}' };
+    state.sequence = { ...state.sequence, kind: 'number', start: 1, padding: 4, prefix: 'AS-', suffix: '', template: 'Asset {value}', barcodeMode: 'value', barcodeTemplate: 'asset:{value}', valuePattern: '{letter}-{number}' };
+  } else if (name === 'letters') {
+    state.sequence = { ...state.sequence, kind: 'letters', letterStart: 'A', step: 1, prefix: '', suffix: '', template: 'Box {value}', barcodeMode: 'template', barcodeTemplate: 'box-{value}', valuePattern: '{letter}-{number}' };
+  } else if (name === 'rack') {
+    state.sequence = { ...state.sequence, kind: 'letters', letterStart: 'A', step: 1, prefix: 'Rack-', suffix: '', template: '{value}\nShelf {index}', barcodeMode: 'value', barcodeTemplate: '{value}', valuePattern: '{letter}-{number}' };
+  } else if (name === 'mixed') {
+    state.sequence = { ...state.sequence, kind: 'mixed', start: 1, letterStart: 'A', step: 1, padding: 3, prefix: '', suffix: '', valuePattern: '{letter}-{number}', template: 'Item {value}', barcodeMode: 'template', barcodeTemplate: 'asset:{letter}-{number}' };
   } else if (name === 'cable') {
-    state.sequence = { ...state.sequence, start: 1, padding: 2, prefix: 'Cable ', suffix: '', template: '{value}\nDestination' };
+    state.sequence = { ...state.sequence, kind: 'number', start: 1, padding: 2, prefix: 'Cable ', suffix: '', template: '{value}\nDestination', barcodeMode: 'first_line', barcodeTemplate: '{value}', valuePattern: '{letter}-{number}' };
   } else if (name === 'year') {
-    state.sequence = { ...state.sequence, start: 1, padding: 4, prefix: '2026-', suffix: '', template: '{value}' };
+    state.sequence = { ...state.sequence, kind: 'number', start: 1, padding: 4, prefix: '2026-', suffix: '', template: '{value}', barcodeMode: 'value', barcodeTemplate: 'serial:{value}', valuePattern: '{letter}-{number}' };
   } else {
-    state.sequence = { ...state.sequence, start: 1, padding: 3, prefix: '', suffix: '', template: '{value}' };
+    state.sequence = { ...state.sequence, kind: 'number', start: 1, padding: 3, prefix: '', suffix: '', template: '{value}', barcodeMode: 'value', barcodeTemplate: '{value}', valuePattern: '{letter}-{number}' };
   }
   saveState();
   render();

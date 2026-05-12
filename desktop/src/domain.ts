@@ -2,12 +2,15 @@ export type Language = 'de' | 'en';
 export type Theme = 'light' | 'dark';
 export type WorkflowMode = 'text' | 'text_code' | 'code' | 'sequence' | 'sequence_code' | 'batch';
 export type BarcodeType = 'code128' | 'code39' | 'ean13' | 'upca' | 'qrcode' | 'datamatrix' | 'pdf417';
-export type CodePosition = 'below' | 'above' | 'right' | 'left';
-export type BarcodeMode = 'none' | 'value' | 'first_line' | 'all_text';
+export type CodePosition = 'below' | 'above' | 'right' | 'left' | 'center';
+export type BarcodeMode = 'none' | 'value' | 'first_line' | 'all_text' | 'template';
 export type Alignment = 'left' | 'center' | 'right';
+export type SequenceKind = 'number' | 'letters' | 'mixed';
 
 export interface SequenceState {
+  kind: SequenceKind;
   start: number;
+  letterStart: string;
   count: number;
   step: number;
   padding: number;
@@ -15,11 +18,14 @@ export interface SequenceState {
   suffix: string;
   template: string;
   barcodeMode: BarcodeMode;
+  barcodeTemplate: string;
+  valuePattern: string;
 }
 
 export interface AppState {
   language: Language;
   theme: Theme;
+  sidebarCollapsed: boolean;
   mode: WorkflowMode;
   printer: string;
   printers: string[];
@@ -58,4 +64,5 @@ export const barcodeLabels: Record<BarcodeType, string> = {
 
 export const modeOrder: WorkflowMode[] = ['text', 'text_code', 'code', 'sequence', 'sequence_code', 'batch'];
 export const barcodeOrder: BarcodeType[] = ['code128', 'code39', 'ean13', 'upca', 'qrcode', 'datamatrix', 'pdf417'];
-export const positionOrder: CodePosition[] = ['below', 'above', 'right', 'left'];
+export const positionOrder: CodePosition[] = ['below', 'above', 'right', 'left', 'center'];
+export const sequenceKindOrder: SequenceKind[] = ['number', 'letters', 'mixed'];
