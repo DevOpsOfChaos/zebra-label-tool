@@ -91,6 +91,12 @@
 
 ## Unreleased
 
+- Stabilized the Tauri sidebar so printer and label settings no longer shift with right-side workflow content.
+- Changed sidebar collapse to a true collapse: only the expand control remains instead of a mini navigation rail.
+- Moved ZPL copy/export actions into the preview header to save workspace space.
+- Removed Tauri quick profile buttons from the main workspace.
+- Added collapsible adjustable templates for common labels instead of always-visible quick profiles.
+- Made the Tauri workflow cards denser by moving text, code, and sequence detail controls into collapsible advanced sections.
 - Fixed the Tauri Windows build scaffold by adding the required application icon.
 - Added compact responsive breakpoints for the Tauri desktop client.
 - Removed the duplicate “code with caption” workflow from the Tauri mode model; use Text + Code for labels with text.

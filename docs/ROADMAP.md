@@ -93,4 +93,4 @@ Next layout improvements:
 
 ## UI workflow polish
 
-The Tauri client now uses progressive disclosure: common workflows are available as quick profile buttons, advanced text/code tools live inside collapsible sections, ZPL is hidden by default until requested, and preview zoom controls help fit labels into smaller windows.
+The Tauri client now uses progressive disclosure: workflow modes stay visible, detailed controls live inside collapsible sections, common templates are available on demand, ZPL copy/export live in the preview header, and the sidebar can fully collapse for a larger preview.

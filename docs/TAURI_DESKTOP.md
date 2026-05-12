@@ -13,7 +13,7 @@ The Tkinter app is useful and still acts as the stable baseline, but it is visua
 - Mode-based workflow:
   - Text only
   - Text + code
-  - Code only + caption
+  - Code only
   - Number sequence
   - Number sequence + code
   - Multiple labels
@@ -97,4 +97,4 @@ The Tauri client supports numeric, letter-based, and mixed letter/number sequenc
 
 ## UI workflow polish
 
-The Tauri client now uses progressive disclosure: common workflows are available as quick profile buttons, advanced text/code tools live inside collapsible sections, ZPL is hidden by default until requested, and preview zoom controls help fit labels into smaller windows.
+The Tauri client now uses progressive disclosure: workflow modes stay visible, printer/label settings are stable in the left sidebar, detailed controls live inside collapsible sections, common label templates are available on demand, ZPL copy/export live in the preview header, and the sidebar can fully collapse when more preview room is needed.

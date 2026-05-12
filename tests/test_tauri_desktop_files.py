@@ -97,25 +97,46 @@ def test_tauri_frontend_supports_centered_codes_and_mixed_sequence_tokens() -> N
     assert "'center'" in domain
     assert "barW" in zpl_ts
     assert "replaceSequenceTokens" in zpl_ts
-    assert "{number:000}" in main_ts or "sequenceTokenHelp" in main_ts
+    assert "{number:000}" in main_ts or "barcodeTemplate" in main_ts
     assert 'data-seq-preset="mixed"' in main_ts
 
 
-def test_tauri_frontend_progressive_disclosure_and_quick_profiles() -> None:
+def test_tauri_frontend_uses_progressive_disclosure_without_quick_profiles() -> None:
     main_ts = (DESKTOP / "src" / "main.ts").read_text(encoding="utf-8")
     css = (DESKTOP / "src" / "styles.css").read_text(encoding="utf-8")
     domain = (DESKTOP / "src" / "domain.ts").read_text(encoding="utf-8")
     i18n = (DESKTOP / "src" / "i18n.ts").read_text(encoding="utf-8")
-    assert "renderWorkflowShortcuts" in main_ts
-    assert "applyWorkflowProfile" in main_ts
-    assert 'data-profile="device_qr"' in main_ts
-    assert 'data-profile="cable_series"' in main_ts
+    assert "renderWorkflowShortcuts" not in main_ts
+    assert "applyWorkflowProfile" not in main_ts
+    assert 'data-profile=' not in main_ts
+    assert "renderTemplatesPanel" in main_ts
+    assert "applyTemplate" in main_ts
+    assert 'data-template="device_qr"' in main_ts
+    assert 'data-template="wifi_qr"' in main_ts
     assert "showZplPanel" in domain
     assert "previewZoom" in domain
     assert "Density = 'comfortable' | 'compact'" in domain
     assert "toggleZplBtn" in main_ts
     assert "zoomInBtn" in main_ts
+    assert "copyZplBtn" in main_ts
+    assert "exportZplBtn" in main_ts
     assert "inline-advanced" in css
-    assert "quick-strip" in css
-    assert "zpl-collapsed" in css
-    assert "quickWorkflows" in i18n
+    assert "template-panel" in css
+    assert "quick-strip" not in css
+    assert "quickWorkflows" not in i18n
+
+
+def test_tauri_sidebar_collapse_is_true_collapse_and_settings_are_stable() -> None:
+    main_ts = (DESKTOP / "src" / "main.ts").read_text(encoding="utf-8")
+    css = (DESKTOP / "src" / "styles.css").read_text(encoding="utf-8")
+    assert "state.sidebarCollapsed ? ''" in main_ts
+    assert "settings-stack" in main_ts
+    assert "position: sticky" in css
+    assert "max-height: calc(100vh - 16px)" in css
+    assert "grid-template-columns: 44px" in css
+
+
+def test_tauri_mode_buttons_have_no_inline_explanations() -> None:
+    main_ts = (DESKTOP / "src" / "main.ts").read_text(encoding="utf-8")
+    assert "modeDescription" not in main_ts
+    assert "<small>" not in main_ts

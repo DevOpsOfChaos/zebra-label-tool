@@ -268,4 +268,4 @@ The Tauri client supports text labels, text + code labels, code-only labels, num
 
 ## UI workflow polish
 
-The Tauri client now uses progressive disclosure: common workflows are available as quick profile buttons, advanced text/code tools live inside collapsible sections, ZPL is hidden by default until requested, and preview zoom controls help fit labels into smaller windows.
+The Tauri client now uses progressive disclosure: common workflows are selected through modes, details live inside collapsible sections, adjustable templates are available on demand, ZPL actions sit in the preview header, and the sidebar can be fully collapsed so the preview has more room.

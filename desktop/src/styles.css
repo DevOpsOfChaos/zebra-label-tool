@@ -165,17 +165,6 @@ textarea { min-height: 86px; resize: vertical; line-height: 1.28; }
   .preview-stage { padding: 8px; }
 }
 
-.quick-strip {
-  display: grid;
-  gap: 7px;
-  background: color-mix(in srgb, var(--panel-strong) 88%, var(--primary) 12%);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 9px;
-}
-.quick-strip strong { display: block; font-size: 13px; }
-.quick-strip span { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
-.quick-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .inline-advanced {
   border: 1px dashed var(--line-strong);
   border-radius: 12px;
@@ -236,11 +225,74 @@ body.compact .mode-button { padding: 7px 8px; }
 body.compact .mode-button strong { font-size: 12px; }
 body.compact .mode-button small { font-size: 9px; }
 
-@media (max-width: 760px) {
-  .quick-strip { padding: 8px; }
-  .quick-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .quick-actions .pill { width: 100%; }
-  .preview-tools { justify-content: flex-start; }
+@media (max-width: 760px) {  .preview-tools { justify-content: flex-start; }
   .sequence-preview { align-items: flex-start; flex-direction: column; }
   .sequence-preview span { white-space: normal; }
+}
+
+/* Mode workflow polish: stable sidebar, true collapsed state, denser controls. */
+.app-shell {
+  grid-template-columns: minmax(210px, 238px) minmax(300px, 0.82fr) minmax(360px, 1.18fr);
+  align-items: start;
+}
+.app-shell.nav-collapsed {
+  grid-template-columns: 44px minmax(320px, 0.78fr) minmax(410px, 1.22fr);
+}
+.sidebar {
+  position: sticky;
+  top: 8px;
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  align-self: start;
+}
+.sidebar.collapsed {
+  min-height: 44px;
+  height: 44px;
+  max-height: 44px;
+  overflow: hidden;
+  padding: 5px;
+  box-shadow: none;
+}
+.sidebar.collapsed .brand-row { justify-content: center; }
+.sidebar.collapsed .icon-button { width: 32px; min-width: 32px; height: 32px; padding: 0; }
+.settings-stack { margin-top: 0; align-content: start; }
+.mode-button { min-height: 34px; padding: 8px 9px; }
+.mode-button strong { font-size: 12px; }
+.mode-button small { display: none; }
+.compact-toolbar { align-items: center; }
+.toolbar-title h2, .preview-header h2 { font-size: 16px; }
+.toolbar-title p { display: none; }
+.card-panel.compact-section { gap: 7px; padding: 8px; }
+.section-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.button.micro { padding: 4px 8px; border-radius: 9px; min-height: 28px; }
+.tight-row { gap: 6px; }
+.template-panel { padding: 8px; }
+.template-panel summary { cursor: pointer; font-weight: 800; list-style: none; font-size: 13px; }
+.template-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.preview-pane { grid-template-rows: auto minmax(240px, 1fr) auto auto; }
+.preview-header { align-items: center; }
+.preview-tools .button { padding: 5px 7px; font-size: 11px; }
+.zpl-collapsed { display: none; }
+.input, textarea, select { min-height: 30px; padding: 5px 8px; border-radius: 9px; }
+textarea { min-height: 70px; }
+#seqTemplate, #batchText { min-height: 62px; }
+.button, .pill { padding: 5px 8px; font-size: 11px; border-radius: 9px; }
+details.card { padding: 7px 8px; }
+details.card summary { font-size: 12px; }
+.field label { font-size: 10px; }
+.inline-advanced { padding: 6px 8px; }
+.inline-advanced > *:not(summary) { margin-top: 6px; }
+
+@media (max-width: 1180px) {
+  .app-shell { grid-template-columns: minmax(205px, 232px) minmax(300px, 1fr); }
+  .app-shell.nav-collapsed { grid-template-columns: 44px minmax(320px, 1fr); }
+  .preview-pane { grid-column: 1 / -1; }
+}
+
+@media (max-width: 900px) {
+  .app-shell.nav-collapsed { grid-template-columns: 44px 1fr; }
+  .app-shell.nav-collapsed .sidebar { grid-column: 1; }
+  .app-shell.nav-collapsed .workspace,
+  .app-shell.nav-collapsed .preview-pane { grid-column: 1 / -1; }
+  .sidebar { position: relative; top: auto; max-height: none; }
 }

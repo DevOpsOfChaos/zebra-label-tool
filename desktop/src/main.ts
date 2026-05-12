@@ -115,26 +115,6 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function modeDescription(mode: WorkflowMode): string {
-  const de: Record<WorkflowMode, string> = {
-    text: 'Schnelle Textetiketten ohne Code-Ballast.',
-    text_code: 'Normaler Alltagsmodus für Text plus Barcode oder QR-Code.',
-    code: 'Ein Barcode oder QR-Code ohne zusätzlichen Text.',
-    sequence: 'Fortlaufende Nummern, Asset-Tags oder Kabelmarkierungen.',
-    sequence_code: 'Fortlaufende Nummern mit Barcode oder QR-Code pro Etikett.',
-    batch: 'Mehrere unterschiedliche Etiketten aus Textblöcken erzeugen.',
-  };
-  const en: Record<WorkflowMode, string> = {
-    text: 'Fast text labels without code-related controls.',
-    text_code: 'Default daily workflow for text plus barcode or QR code.',
-    code: 'A barcode or QR code without additional text.',
-    sequence: 'Numbered asset tags, cable markers and serial labels.',
-    sequence_code: 'Numbered labels with a barcode or QR code per label.',
-    batch: 'Generate multiple different labels from text blocks.',
-  };
-  return state.language === 'de' ? de[mode] : en[mode];
-}
-
 function render(): void {
   document.body.classList.toggle('dark', state.theme === 'dark');
   document.body.classList.toggle('compact', state.density === 'compact');
@@ -144,38 +124,34 @@ function render(): void {
     <main class="app-shell ${state.sidebarCollapsed ? 'nav-collapsed' : ''}">
       <aside class="sidebar ${state.sidebarCollapsed ? 'collapsed' : ''}">
         <div class="brand-row">
-          <div class="brand">
-            <h1>${t(state.language, 'appTitle')}</h1>
-            <p>${t(state.language, 'appSubtitle')}</p>
-          </div>
+          ${state.sidebarCollapsed ? '' : `<div class="brand"><h1>${t(state.language, 'appTitle')}</h1><p>${t(state.language, 'appSubtitle')}</p></div>`}
           <button class="button icon-button" id="toggleSidebarBtn" title="${t(state.language, 'toggleSidebar')}">${state.sidebarCollapsed ? '›' : '‹'}</button>
         </div>
-        <div class="mode-list" aria-label="${t(state.language, 'mode')}">
-          ${modeOrder.map(modeButton).join('')}
-        </div>
-        ${state.sidebarCollapsed ? '' : `<div class="settings-stack">
-          ${renderPrinterSettings()}
-          ${renderLabelSettings()}
-          ${renderAppSettings()}
-        </div>`}
+        ${state.sidebarCollapsed ? '' : `
+          <div class="mode-list" aria-label="${t(state.language, 'mode')}">
+            ${modeOrder.map(modeButton).join('')}
+          </div>
+          <div class="settings-stack">
+            ${renderPrinterSettings()}
+            ${renderLabelSettings()}
+            ${renderAppSettings()}
+          </div>
+        `}
       </aside>
       <section class="workspace">
-        <div class="toolbar">
+        <div class="toolbar compact-toolbar">
           <div class="toolbar-title">
             <h2>${modeLabel(state.language, state.mode)}</h2>
-            <p>${modeDescription(state.mode)}</p>
           </div>
           <div class="toolbar-actions">
-            <button class="button" id="copyZplBtn">${t(state.language, 'copyZpl')}</button>
-            <button class="button" id="exportZplBtn">${t(state.language, 'exportZpl')}</button>
             <button class="button primary" id="printBtn">${t(state.language, 'print')}</button>
           </div>
         </div>
-        ${renderWorkflowShortcuts()}
         ${renderTextPanel()}
         ${renderCodePanel()}
         ${renderSequencePanel()}
         ${renderBatchPanel()}
+        ${renderTemplatesPanel()}
       </section>
       <aside class="preview-pane">
         <div class="preview-header">
@@ -184,6 +160,8 @@ function render(): void {
             <p>${summaryText()}</p>
           </div>
           <div class="preview-tools">
+            <button class="button ghost" id="copyZplBtn">${t(state.language, 'copyZplShort')}</button>
+            <button class="button ghost" id="exportZplBtn">${t(state.language, 'exportZplShort')}</button>
             <button class="button ghost" id="zoomOutBtn" title="${t(state.language, 'zoomOut')}">−</button>
             <button class="button ghost" id="fitPreviewBtn" title="${t(state.language, 'fitPreview')}">Fit</button>
             <button class="button ghost" id="zoomInBtn" title="${t(state.language, 'zoomIn')}">+</button>
@@ -207,28 +185,7 @@ function modeButton(mode: WorkflowMode): string {
   return `
     <button class="mode-button ${state.mode === mode ? 'active' : ''}" data-mode="${mode}" title="${modeLabel(state.language, mode)}">
       <strong>${modeLabel(state.language, mode)}</strong>
-      <small>${modeDescription(mode)}</small>
     </button>
-  `;
-}
-
-
-function renderWorkflowShortcuts(): string {
-  return `
-    <section class="quick-strip" aria-label="${t(state.language, 'quickWorkflows')}">
-      <div>
-        <strong>${t(state.language, 'quickWorkflows')}</strong>
-        <span>${t(state.language, 'quickWorkflowsHelp')}</span>
-      </div>
-      <div class="quick-actions">
-        <button class="pill" data-profile="plain_text">${t(state.language, 'profilePlain')}</button>
-        <button class="pill" data-profile="device_qr">${t(state.language, 'profileDeviceQr')}</button>
-        <button class="pill" data-profile="asset_qr">${t(state.language, 'profileAsset')}</button>
-        <button class="pill" data-profile="center_qr">${t(state.language, 'profileCenterQr')}</button>
-        <button class="pill" data-profile="cable_series">${t(state.language, 'profileCableSeries')}</button>
-        <button class="pill" data-profile="batch_boxes">${t(state.language, 'profileBatchBoxes')}</button>
-      </div>
-    </section>
   `;
 }
 
@@ -286,28 +243,30 @@ function renderTextPanel(): string {
   const visible = state.mode === 'text' || state.mode === 'text_code' || state.mode === 'sequence' || state.mode === 'sequence_code';
   if (!visible) return '';
   return `
-    <section class="card-panel">
-      <div>
+    <section class="card-panel compact-section">
+      <div class="section-head">
         <h3>${t(state.language, 'labelText')}</h3>
-        <p class="help">${t(state.language, 'labelTextHelp')}</p>
+        <button class="button danger micro" id="clearTextBtn" title="${t(state.language, 'clearContent')}">✕</button>
       </div>
       <textarea id="textInput" spellcheck="false">${escapeHtml(state.text)}</textarea>
-      <div class="grid-3">
-        ${numberField('fontSize', t(state.language, 'font'), state.fontSize, 8, 160)}
-        ${numberField('lineGap', t(state.language, 'lineGap'), state.lineGap, 0, 80)}
-        <div class="field"><label>${t(state.language, 'alignment')}</label><select id="alignment"><option value="left" ${state.alignment === 'left' ? 'selected' : ''}>${t(state.language, 'left')}</option><option value="center" ${state.alignment === 'center' ? 'selected' : ''}>${t(state.language, 'center')}</option><option value="right" ${state.alignment === 'right' ? 'selected' : ''}>${t(state.language, 'right')}</option></select></div>
-      </div>
-      <div class="checkbox-row">
-        <label><input id="autoFit" type="checkbox" ${state.autoFit ? 'checked' : ''}> ${t(state.language, 'autoFit')}</label>
-        <button class="button danger" id="clearTextBtn">✕</button>
-        <button class="button" id="cleanBtn">${t(state.language, 'clean')}</button>
-        <button class="button" id="upperBtn">${t(state.language, 'uppercase')}</button>
-        <button class="button" id="lowerBtn">${t(state.language, 'lower')}</button>
-        <button class="button" id="titleBtn">${t(state.language, 'titleCase')}</button>
-      </div>
+      <details class="inline-advanced">
+        <summary>${t(state.language, 'textOptions')}</summary>
+        <div class="grid-3 compact-grid">
+          ${numberField('fontSize', t(state.language, 'font'), state.fontSize, 8, 160)}
+          ${numberField('lineGap', t(state.language, 'lineGap'), state.lineGap, 0, 80)}
+          <div class="field"><label>${t(state.language, 'alignment')}</label><select id="alignment"><option value="left" ${state.alignment === 'left' ? 'selected' : ''}>${t(state.language, 'left')}</option><option value="center" ${state.alignment === 'center' ? 'selected' : ''}>${t(state.language, 'center')}</option><option value="right" ${state.alignment === 'right' ? 'selected' : ''}>${t(state.language, 'right')}</option></select></div>
+        </div>
+        <div class="checkbox-row tight-row">
+          <label><input id="autoFit" type="checkbox" ${state.autoFit ? 'checked' : ''}> ${t(state.language, 'autoFit')}</label>
+        </div>
+      </details>
       <details class="inline-advanced">
         <summary>${t(state.language, 'moreTextTools')}</summary>
         <div class="pill-row">
+          <button class="button" id="cleanBtn">${t(state.language, 'clean')}</button>
+          <button class="button" id="upperBtn">${t(state.language, 'uppercase')}</button>
+          <button class="button" id="lowerBtn">${t(state.language, 'lower')}</button>
+          <button class="button" id="titleBtn">${t(state.language, 'titleCase')}</button>
           <button class="button" id="trimBtn">${t(state.language, 'trimLines')}</button>
           <button class="button" id="dedupeBtn">${t(state.language, 'dedupeLines')}</button>
           <button class="button" id="sampleTextBtn">${t(state.language, 'sampleText')}</button>
@@ -321,27 +280,28 @@ function renderCodePanel(): string {
   const visible = state.mode === 'text_code' || state.mode === 'code' || state.mode === 'sequence_code';
   if (!visible) return '';
   return `
-    <section class="card-panel">
+    <section class="card-panel compact-section">
       <h3>${t(state.language, 'codeSection')}</h3>
-      <p class="help">${t(state.language, 'codeHelp')}</p>
       <div class="grid-2 compact-grid">
         <div class="field"><label>${t(state.language, 'codeType')}</label><select id="codeType">${barcodeOrder.map((type) => `<option value="${type}" ${state.codeType === type ? 'selected' : ''}>${barcodeLabels[type]}</option>`).join('')}</select></div>
         <div class="field"><label>${t(state.language, 'codePosition')}</label><select id="codePosition">${positionOrder.map((pos) => `<option value="${pos}" ${state.codePosition === pos ? 'selected' : ''}>${t(state.language, pos)}</option>`).join('')}</select></div>
-        ${numberField('codeArea', t(state.language, 'codeArea'), state.codeArea, 30, 320)}
-        ${numberField('codeMagnification', t(state.language, 'magnification'), state.codeMagnification, 1, 12)}
-      </div>
-      <div class="pill-row compact-pills" aria-label="${t(state.language, 'codeSize')}">
-        <span class="inline-label">${t(state.language, 'codeSize')}</span>
-        <button class="pill" data-code-size="small">S</button>
-        <button class="pill" data-code-size="medium">M</button>
-        <button class="pill" data-code-size="large">L</button>
-        <button class="pill" data-code-size="xl">XL</button>
-        <button class="pill ${state.codePosition === 'center' ? 'active' : ''}" data-code-center="1">${t(state.language, 'centerCode')}</button>
       </div>
       ${state.mode !== 'sequence_code' ? `<div class="field"><label>${t(state.language, 'codeContent')}</label><input class="input" id="codeContent" value="${escapeAttr(state.codeContent)}"></div>` : ''}
       <details class="inline-advanced">
-        <summary>${t(state.language, 'advancedCode')}</summary>
-        <div class="checkbox-row"><label><input id="showBarcodeText" type="checkbox" ${state.showBarcodeText ? 'checked' : ''}> ${t(state.language, 'humanText')}</label></div>
+        <summary>${t(state.language, 'codeOptions')}</summary>
+        <div class="grid-2 compact-grid">
+          ${numberField('codeArea', t(state.language, 'codeArea'), state.codeArea, 30, 320)}
+          ${numberField('codeMagnification', t(state.language, 'magnification'), state.codeMagnification, 1, 12)}
+        </div>
+        <div class="pill-row compact-pills" aria-label="${t(state.language, 'codeSize')}">
+          <span class="inline-label">${t(state.language, 'codeSize')}</span>
+          <button class="pill" data-code-size="small">S</button>
+          <button class="pill" data-code-size="medium">M</button>
+          <button class="pill" data-code-size="large">L</button>
+          <button class="pill" data-code-size="xl">XL</button>
+          <button class="pill ${state.codePosition === 'center' ? 'active' : ''}" data-code-center="1">${t(state.language, 'centerCode')}</button>
+        </div>
+        <div class="checkbox-row tight-row"><label><input id="showBarcodeText" type="checkbox" ${state.showBarcodeText ? 'checked' : ''}> ${t(state.language, 'humanText')}</label></div>
         <div class="pill-row">
           <button class="button" id="codeFromFirstLineBtn">${t(state.language, 'useFirstLine')}</button>
           <button class="button" id="codeFromAllTextBtn">${t(state.language, 'useAllText')}</button>
@@ -356,32 +316,57 @@ function renderSequencePanel(): string {
   const visible = state.mode === 'sequence' || state.mode === 'sequence_code';
   if (!visible) return '';
   return `
-    <section class="card-panel">
+    <section class="card-panel compact-section">
       <h3>${t(state.language, 'sequenceSettings')}</h3>
       <div class="grid-3 compact-grid">
         <div class="field"><label>${t(state.language, 'sequenceKind')}</label><select id="seqKind">${sequenceKindOrder.map((kind) => `<option value="${kind}" ${state.sequence.kind === kind ? 'selected' : ''}>${kind === 'letters' ? t(state.language, 'letterSequence') : kind === 'mixed' ? t(state.language, 'mixedSequence') : t(state.language, 'numberSequence')}</option>`).join('')}</select></div>
-        ${state.sequence.kind !== 'letters' ? numberField('seqStart', t(state.language, 'start'), state.sequence.start, -999999, 999999) : ''}
-        ${state.sequence.kind !== 'number' ? `<div class="field"><label>${t(state.language, 'letterStart')}</label><input class="input" id="seqLetterStart" value="${escapeAttr(state.sequence.letterStart)}"></div>` : ''}
         ${numberField('seqCount', t(state.language, 'count'), state.sequence.count, 1, 500)}
-        ${numberField('seqStep', t(state.language, 'step'), state.sequence.step, -9999, 9999)}
-        ${state.sequence.kind !== 'letters' ? numberField('seqPadding', t(state.language, 'padding'), state.sequence.padding, 0, 12) : ''}
-        <div class="field"><label>${t(state.language, 'prefix')}</label><input class="input" id="seqPrefix" value="${escapeAttr(state.sequence.prefix)}"></div>
-        <div class="field"><label>${t(state.language, 'suffix')}</label><input class="input" id="seqSuffix" value="${escapeAttr(state.sequence.suffix)}"></div>
+        ${state.sequence.kind === 'mixed' ? `<div class="field"><label>${t(state.language, 'valuePattern')}</label><input class="input" id="seqValuePattern" value="${escapeAttr(state.sequence.valuePattern)}"></div>` : ''}
       </div>
-      ${state.sequence.kind === 'mixed' ? `<div class="field"><label>${t(state.language, 'valuePattern')}</label><input class="input" id="seqValuePattern" value="${escapeAttr(state.sequence.valuePattern)}"><p class="help">${t(state.language, 'sequenceTokenHelp')}</p></div>` : ''}
-      <div class="field"><label>${t(state.language, 'template')}</label><textarea id="seqTemplate">${escapeHtml(state.sequence.template)}</textarea><p class="help">${t(state.language, 'sequenceTokenHelp')}</p></div>
-      ${state.mode === 'sequence_code' ? `<div class="grid-2 compact-grid"><div class="field"><label>${t(state.language, 'barcodeMode')}</label><select id="barcodeMode"><option value="value" ${state.sequence.barcodeMode === 'value' ? 'selected' : ''}>${t(state.language, 'value')}</option><option value="first_line" ${state.sequence.barcodeMode === 'first_line' ? 'selected' : ''}>${t(state.language, 'first_line')}</option><option value="all_text" ${state.sequence.barcodeMode === 'all_text' ? 'selected' : ''}>${t(state.language, 'all_text')}</option><option value="template" ${state.sequence.barcodeMode === 'template' ? 'selected' : ''}>${t(state.language, 'templateMode')}</option></select></div><div class="field"><label>${t(state.language, 'barcodeTemplate')}</label><input class="input" id="seqBarcodeTemplate" value="${escapeAttr(state.sequence.barcodeTemplate)}"><p class="help">${t(state.language, 'sequenceTokenHelp')}</p></div></div>` : ''}
+      <div class="field"><label>${t(state.language, 'template')}</label><textarea id="seqTemplate">${escapeHtml(state.sequence.template)}</textarea></div>
+      ${state.mode === 'sequence_code' ? `<details class="inline-advanced" open><summary>${t(state.language, 'sequenceCodeOptions')}</summary><div class="grid-2 compact-grid"><div class="field"><label>${t(state.language, 'barcodeMode')}</label><select id="barcodeMode"><option value="value" ${state.sequence.barcodeMode === 'value' ? 'selected' : ''}>${t(state.language, 'value')}</option><option value="first_line" ${state.sequence.barcodeMode === 'first_line' ? 'selected' : ''}>${t(state.language, 'first_line')}</option><option value="all_text" ${state.sequence.barcodeMode === 'all_text' ? 'selected' : ''}>${t(state.language, 'all_text')}</option><option value="template" ${state.sequence.barcodeMode === 'template' ? 'selected' : ''}>${t(state.language, 'templateMode')}</option></select></div><div class="field"><label>${t(state.language, 'barcodeTemplate')}</label><input class="input" id="seqBarcodeTemplate" value="${escapeAttr(state.sequence.barcodeTemplate)}"></div></div></details>` : ''}
       <div class="sequence-preview"><strong>${t(state.language, 'nextValues')}</strong><span>${sequenceValues(state).slice(0, 5).map(escapeHtml).join(' · ')}</span></div>
-      <div class="pill-row" aria-label="${t(state.language, 'sequencePresets')}">
-        <button class="pill" data-seq-preset="001">001, 002, 003</button>
-        <button class="pill" data-seq-preset="asset">AS-0001</button>
-        <button class="pill" data-seq-preset="letters">A, B, C</button>
-        <button class="pill" data-seq-preset="rack">Rack-A</button>
-        <button class="pill" data-seq-preset="mixed">A-001</button>
-        <button class="pill" data-seq-preset="cable">Cable 01</button>
-        <button class="pill" data-seq-preset="year">2026-0001</button>
-      </div>
+      <details class="inline-advanced">
+        <summary>${t(state.language, 'sequenceOptions')}</summary>
+        <div class="grid-3 compact-grid">
+          ${state.sequence.kind !== 'letters' ? numberField('seqStart', t(state.language, 'start'), state.sequence.start, -999999, 999999) : ''}
+          ${state.sequence.kind !== 'number' ? `<div class="field"><label>${t(state.language, 'letterStart')}</label><input class="input" id="seqLetterStart" value="${escapeAttr(state.sequence.letterStart)}"></div>` : ''}
+          ${numberField('seqStep', t(state.language, 'step'), state.sequence.step, -9999, 9999)}
+          ${state.sequence.kind !== 'letters' ? numberField('seqPadding', t(state.language, 'padding'), state.sequence.padding, 0, 12) : ''}
+          <div class="field"><label>${t(state.language, 'prefix')}</label><input class="input" id="seqPrefix" value="${escapeAttr(state.sequence.prefix)}"></div>
+          <div class="field"><label>${t(state.language, 'suffix')}</label><input class="input" id="seqSuffix" value="${escapeAttr(state.sequence.suffix)}"></div>
+        </div>
+      </details>
+      <details class="inline-advanced">
+        <summary>${t(state.language, 'sequencePresets')}</summary>
+        <div class="pill-row" aria-label="${t(state.language, 'sequencePresets')}">
+          <button class="pill" data-seq-preset="001">001, 002, 003</button>
+          <button class="pill" data-seq-preset="asset">AS-0001</button>
+          <button class="pill" data-seq-preset="letters">A, B, C</button>
+          <button class="pill" data-seq-preset="rack">Rack-A</button>
+          <button class="pill" data-seq-preset="mixed">A-001</button>
+          <button class="pill" data-seq-preset="cable">Cable 01</button>
+          <button class="pill" data-seq-preset="year">2026-0001</button>
+        </div>
+      </details>
     </section>
+  `;
+}
+
+function renderTemplatesPanel(): string {
+  return `
+    <details class="card-panel template-panel">
+      <summary>${t(state.language, 'templates')}</summary>
+      <div class="template-grid">
+        <button class="pill" data-template="device_qr">${t(state.language, 'tplDeviceQr')}</button>
+        <button class="pill" data-template="asset_qr">${t(state.language, 'tplAssetQr')}</button>
+        <button class="pill" data-template="wifi_qr">${t(state.language, 'tplWifiQr')}</button>
+        <button class="pill" data-template="shelf_box">${t(state.language, 'tplShelfBox')}</button>
+        <button class="pill" data-template="cable_marker">${t(state.language, 'tplCableMarker')}</button>
+        <button class="pill" data-template="maintenance">${t(state.language, 'tplMaintenance')}</button>
+        <button class="pill" data-template="shipping">${t(state.language, 'tplShipping')}</button>
+      </div>
+    </details>
   `;
 }
 
@@ -519,8 +504,8 @@ function bindEvents(): void {
   click('codeFromFirstLineBtn', () => setState({ codeContent: cleanLines(state.text).find((line) => line.trim()) ?? state.codeContent }));
   click('codeFromAllTextBtn', () => setState({ codeContent: cleanLines(state.text).filter((line) => line.trim()).join(' | ') }));
   click('sampleQrBtn', () => setState({ codeType: 'qrcode', codeContent: 'https://example.local/device/1', codePosition: 'right', codeArea: 120, codeMagnification: 5 }));
-  document.querySelectorAll<HTMLButtonElement>('[data-profile]').forEach((button) => {
-    button.addEventListener('click', () => applyWorkflowProfile(button.dataset.profile ?? 'plain_text'));
+  document.querySelectorAll<HTMLButtonElement>('[data-template]').forEach((button) => {
+    button.addEventListener('click', () => applyTemplate(button.dataset.template ?? 'device_qr'));
   });
   document.querySelectorAll<HTMLButtonElement>('[data-code-size]').forEach((button) => {
     button.addEventListener('click', () => applyCodeSize(button.dataset.codeSize ?? 'medium'));
@@ -549,19 +534,21 @@ function updateText(fn: (text: string) => string): void {
 }
 
 
-function applyWorkflowProfile(profile: string): void {
-  if (profile === 'device_qr') {
-    setState({ mode: 'text_code', widthMm: 57, heightMm: 25, text: 'Device\nESP32-Kitchen', codeType: 'qrcode', codeContent: 'https://example.local/device/esp32-kitchen', codePosition: 'right', codeArea: 120, codeMagnification: 5, fontSize: 44, alignment: 'left' });
-  } else if (profile === 'asset_qr') {
+function applyTemplate(name: string): void {
+  if (name === 'device_qr') {
+    setState({ mode: 'text_code', widthMm: 57, heightMm: 25, text: 'Device\nESP32-Kitchen', codeType: 'qrcode', codeContent: 'https://example.local/device/esp32-kitchen', codePosition: 'right', codeArea: 120, codeMagnification: 5, fontSize: 42, alignment: 'left', border: false });
+  } else if (name === 'asset_qr') {
     setState({ mode: 'text_code', widthMm: 62, heightMm: 29, text: 'Asset AS-0001\nRack A', codeType: 'qrcode', codeContent: 'asset:AS-0001', codePosition: 'right', codeArea: 115, codeMagnification: 5, fontSize: 38, alignment: 'left', border: true });
-  } else if (profile === 'center_qr') {
-    setState({ mode: 'code', widthMm: 40, heightMm: 40, text: '', codeType: 'qrcode', codeContent: 'https://example.local', codePosition: 'center', codeArea: 210, codeMagnification: 7, border: false });
-  } else if (profile === 'cable_series') {
-    setState({ mode: 'sequence_code', widthMm: 57, heightMm: 19, codeType: 'code128', codePosition: 'below', codeArea: 55, codeMagnification: 3, fontSize: 30, sequence: { ...state.sequence, kind: 'mixed', count: 12, padding: 2, letterStart: 'A', start: 1, prefix: '', suffix: '', valuePattern: 'CB-{letter}-{number:00}', template: '{value}\nCable', barcodeMode: 'value', barcodeTemplate: '{value}' } });
-  } else if (profile === 'batch_boxes') {
-    setState({ mode: 'batch', widthMm: 57, heightMm: 19, batchText: 'Box A-01\nShelf A\n\nBox A-02\nShelf A\n\nBox B-01\nShelf B', border: true });
-  } else {
-    setState({ mode: 'text', widthMm: 57, heightMm: 19, text: 'Label text', codeContent: '', codePosition: 'below', fontSize: 54, alignment: 'center', border: false });
+  } else if (name === 'wifi_qr') {
+    setState({ mode: 'text_code', widthMm: 70, heightMm: 35, text: 'Wi-Fi\nWorkshop', codeType: 'qrcode', codeContent: 'WIFI:T:WPA;S:Workshop;P:change-me;;', codePosition: 'right', codeArea: 135, codeMagnification: 5, fontSize: 36, alignment: 'left', border: true });
+  } else if (name === 'shelf_box') {
+    setState({ mode: 'text', widthMm: 57, heightMm: 19, text: 'Shelf A\nBox 01', codeContent: '', fontSize: 50, alignment: 'center', border: true });
+  } else if (name === 'cable_marker') {
+    setState({ mode: 'sequence_code', widthMm: 57, heightMm: 19, codeType: 'code128', codePosition: 'below', codeArea: 55, codeMagnification: 3, fontSize: 30, alignment: 'center', sequence: { ...state.sequence, kind: 'mixed', count: 12, padding: 2, letterStart: 'A', start: 1, prefix: '', suffix: '', valuePattern: 'CB-{letter}-{number:00}', template: '{value}\nCable', barcodeMode: 'value', barcodeTemplate: '{value}' } });
+  } else if (name === 'maintenance') {
+    setState({ mode: 'text_code', widthMm: 70, heightMm: 30, text: 'Service\nNext check', codeType: 'qrcode', codeContent: 'service:next-check', codePosition: 'right', codeArea: 120, codeMagnification: 5, fontSize: 36, alignment: 'left', border: true });
+  } else if (name === 'shipping') {
+    setState({ mode: 'text_code', widthMm: 100, heightMm: 50, text: 'Package\nOrder 1001', codeType: 'code128', codeContent: 'ORDER-1001', codePosition: 'below', codeArea: 80, codeMagnification: 3, fontSize: 50, alignment: 'center', border: true });
   }
 }
 
