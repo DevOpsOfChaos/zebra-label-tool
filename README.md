@@ -45,9 +45,10 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Optional 2D codes: QR Code, Data Matrix, PDF417. QR preview uses a real QR matrix; Data Matrix/PDF417 are printer-rendered from ZPL and shown with deterministic layout previews.
 - Barcode/QR setup through the top menu to keep the main window clean
 - Side-by-side label layouts: place barcode/QR/Data Matrix/PDF417 code areas above, below, left, or right of the text
-- Top menu workflow for Label, Text, Barcode/QR, ZPL, text cleanup, and batch tools
+- Top menu workflow for Label, Text, Barcode/QR, ZPL, text cleanup, batch tools, and numbered label series
 - Text cleanup actions: trim whitespace, remove empty lines, uppercase, lowercase, title case, and wrap long lines
 - Batch label ZPL generation from pasted text blocks
+- Number sequence tool for serial labels, asset IDs, cable markers, storage bins, and other numbered runs
 - Layout quality warnings for auto-fit, empty labels, long barcodes, and line limits
 - Built-in presets with fill-in dialogs when a preset contains a barcode/QR payload
 - Templates moved to the bottom of the main panel
@@ -132,6 +133,9 @@ Example with multiple lines and a barcode:
 
 ```powershell
 python -m zebra_label_tool "Shelf A-12" "Box 04" --line "Batch 7" --barcode "A12-04" --border
+
+# Generate a numbered ZPL series
+python -m zebra_label_tool "Asset {value}" "Rack A" --sequence-count 10 --sequence-prefix AS- --sequence-padding 4
 ```
 
 Example with QR code on the right side of the text:

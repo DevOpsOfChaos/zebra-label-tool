@@ -76,3 +76,7 @@ Open **Settings > Language / Sprache** and choose the desired language. The sele
 ## Barcode/QR area overlaps text
 
 Use the compact **Label layout** area in the main window. For side-by-side labels choose **Right side** or **Left side** for the code area and increase the code-area size. For very small labels, reduce font size or enable Auto-fit.
+
+## Number sequence export fails
+
+Check the selected barcode/QR payload mode. EAN-13 and UPC-A require numeric values, so prefixed values such as `AS-0001` are not valid for those symbologies. Use Code 128 or QR Code for mixed letters/numbers.

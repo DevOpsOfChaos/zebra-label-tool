@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
@@ -36,6 +37,7 @@ from .constants import (
 )
 from .i18n import SUPPORTED_LANGUAGES, normalize_language, translate
 from .label_spec import LabelSpec, LabelSpecError, MAX_TEXT_LINES
+from .number_sequences import NumberSequenceError, build_number_sequence_specs, generate_number_sequence_zpl, generate_sequence_values, normalize_number_sequence_options, render_sequence_lines
 from .layout import calculate_layout_for_lines, mm_to_dots
 from .presets import BUILTIN_PRESETS, get_builtin_preset, render_preset_settings
 from .preview import LabelPreviewCanvas
@@ -49,6 +51,7 @@ FONT_STYLE_LABELS = ["A0  (smooth)", "A  (Bitmap)"]
 ALIGNMENT_LABELS = ["center", "left", "right", "justify"]
 ROTATION_LABELS = ["normal", "90", "180", "270"]
 BARCODE_POSITION_KEYS = ["below", "above", "right", "left"]
+SEQUENCE_BARCODE_MODE_KEYS = ["none", "value", "first_line", "all_text"]
 
 
 def _position_label(language: str | None, position: str) -> str:
@@ -89,6 +92,23 @@ def _layout_profile_key(language: str | None, value: str) -> str:
 
 
 
+
+
+def _sequence_barcode_mode_label(language: str | None, mode: str) -> str:
+    key = str(mode or "none").strip().lower()
+    return translate(language, f"sequence.barcode_mode.{key}")
+
+
+def _sequence_barcode_mode_key(language: str | None, value: str) -> str:
+    raw = str(value or "none").strip().lower()
+    for key in SEQUENCE_BARCODE_MODE_KEYS:
+        if raw == key or raw == translate(language, f"sequence.barcode_mode.{key}").lower() or raw == translate("en", f"sequence.barcode_mode.{key}").lower() or raw == translate("de", f"sequence.barcode_mode.{key}").lower():
+            return key
+    return "none"
+
+
+def _sequence_barcode_mode_labels(language: str | None) -> list[str]:
+    return [_sequence_barcode_mode_label(language, key) for key in SEQUENCE_BARCODE_MODE_KEYS]
 
 def _preset_i18n_key(name: str) -> str:
     return "preset." + "_".join(str(name).lower().replace("-", " ").split())
@@ -140,6 +160,8 @@ class ZebraApp(ctk.CTk):
         self._zpl_window_box: ctk.CTkTextbox | None = None
         self._batch_window: ctk.CTkToplevel | None = None
         self._batch_text_box: ctk.CTkTextbox | None = None
+        self._sequence_window: ctk.CTkToplevel | None = None
+        self._sequence_preview_box: ctk.CTkTextbox | None = None
 
         self.title(APP_TITLE)
         self.geometry("1120x760")
@@ -241,6 +263,7 @@ class ZebraApp(ctk.CTk):
         self.bind("<Control-t>", lambda e: self._open_text_options())
         self.bind("<Control-b>", lambda e: self._open_barcode_options())
         self.bind("<Control-Shift-B>", lambda e: self._open_batch_window())
+        self.bind("<Control-Shift-N>", lambda e: self._open_number_sequence_window())
         self.bind("<F5>", lambda e: self._refresh_printers())
 
     def _build_menu(self) -> None:
@@ -311,6 +334,7 @@ class ZebraApp(ctk.CTk):
 
         tools_menu = tk.Menu(menubar, tearoff=False)
         tools_menu.add_command(label=self._t("action.batch"), accelerator="Ctrl+Shift+B", command=self._open_batch_window)
+        tools_menu.add_command(label=self._t("action.number_sequence"), accelerator="Ctrl+Shift+N", command=self._open_number_sequence_window)
         tools_menu.add_separator()
         tools_menu.add_command(label=self._t("action.reset_layout"), command=self._reset_layout_options)
         menubar.add_cascade(label=self._t("menu.tools"), menu=tools_menu)
@@ -1128,6 +1152,214 @@ class ZebraApp(ctk.CTk):
         self._update_all()
         self._status(self._t("status.layout_reset"), COL_SUCCESS)
 
+
+    def _open_number_sequence_window(self, _=None) -> None:
+        if self._sequence_window is not None and self._sequence_window.winfo_exists():
+            self._sequence_window.focus()
+            return
+        win = ctk.CTkToplevel(self)
+        win.title(self._t("dialog.number_sequence"))
+        win.geometry("900x660")
+        win.minsize(760, 560)
+        win.grid_columnconfigure(0, weight=0, minsize=330)
+        win.grid_columnconfigure(1, weight=1)
+        win.grid_rowconfigure(1, weight=1)
+        win.protocol("WM_DELETE_WINDOW", self._close_number_sequence_window)
+        self._sequence_window = win
+
+        header = ctk.CTkFrame(win, fg_color="transparent")
+        header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=14, pady=(14, 8))
+        header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(header, text=self._t("dialog.number_sequence"), font=ctk.CTkFont(size=17, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(header, text=self._t("sequence.hint"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=1, column=0, sticky="w")
+
+        controls = ctk.CTkFrame(win, fg_color=COL_PANEL, corner_radius=12, border_width=1, border_color=COL_BORDER)
+        controls.grid(row=1, column=0, sticky="nsew", padx=(14, 8), pady=(0, 14))
+        controls.grid_columnconfigure(1, weight=1)
+
+        preview = ctk.CTkFrame(win, fg_color=COL_PANEL, corner_radius=12, border_width=1, border_color=COL_BORDER)
+        preview.grid(row=1, column=1, sticky="nsew", padx=(8, 14), pady=(0, 14))
+        preview.grid_columnconfigure(0, weight=1)
+        preview.grid_rowconfigure(1, weight=1)
+        ctk.CTkLabel(preview, text=self._t("sequence.preview"), font=ctk.CTkFont(size=13, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w", padx=12, pady=(12, 4))
+        self._sequence_preview_box = ctk.CTkTextbox(preview, font=ctk.CTkFont(size=13), fg_color="#ffffff", text_color=COL_TEXT, wrap="none")
+        self._sequence_preview_box.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 10))
+        self._sequence_preview_box.configure(state="disabled")
+
+        current_lines = [line for line in self._get_text_lines() if line.strip()]
+        default_template = "\n".join(current_lines + ["{value}"]) if current_lines else "{value}"
+        start_var = tk.StringVar(value="1")
+        count_var = tk.StringVar(value="10")
+        step_var = tk.StringVar(value="1")
+        padding_var = tk.StringVar(value="3")
+        prefix_var = tk.StringVar(value="")
+        suffix_var = tk.StringVar(value="")
+        enable_code_var = tk.BooleanVar(value=self.barcode_var.get())
+        code_mode_var = tk.StringVar(value=_sequence_barcode_mode_label(self.lang, "value"))
+        type_var = tk.StringVar(value=self.barcode_type_var.get())
+        pos_var = tk.StringVar(value=self.barcode_pos_var.get())
+
+        def add_label(row: int, text: str) -> None:
+            ctk.CTkLabel(controls, text=text, text_color=COL_MUTED, font=ctk.CTkFont(size=11)).grid(row=row, column=0, sticky="w", padx=(12, 8), pady=6)
+
+        def add_entry(row: int, label: str, var: tk.StringVar) -> ctk.CTkEntry:
+            add_label(row, label)
+            entry = ctk.CTkEntry(controls, textvariable=var, height=30)
+            entry.grid(row=row, column=1, sticky="ew", padx=(0, 12), pady=6)
+            entry.bind("<KeyRelease>", lambda _: update_preview())
+            return entry
+
+        ctk.CTkLabel(controls, text=self._t("sequence.range"), font=ctk.CTkFont(size=13, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, columnspan=2, sticky="w", padx=12, pady=(12, 2))
+        add_entry(1, self._t("sequence.start"), start_var)
+        add_entry(2, self._t("sequence.count"), count_var)
+        add_entry(3, self._t("sequence.step"), step_var)
+        add_entry(4, self._t("sequence.padding"), padding_var)
+        add_entry(5, self._t("sequence.prefix"), prefix_var)
+        add_entry(6, self._t("sequence.suffix"), suffix_var)
+
+        quick = ctk.CTkFrame(controls, fg_color="transparent")
+        quick.grid(row=7, column=0, columnspan=2, sticky="ew", padx=12, pady=(2, 8))
+        for col in range(2):
+            quick.grid_columnconfigure(col, weight=1)
+
+        def set_variant(prefix: str, padding: int, template: str, start: int = 1, step: int = 1) -> None:
+            prefix_var.set(prefix)
+            padding_var.set(str(padding))
+            start_var.set(str(start))
+            step_var.set(str(step))
+            template_box.delete("1.0", "end")
+            template_box.insert("1.0", template)
+            update_preview()
+
+        ctk.CTkButton(quick, text="001, 002, 003", height=28, command=lambda: set_variant("", 3, "{value}"), **_secondary_button_style()).grid(row=0, column=0, sticky="ew", padx=(0, 4), pady=(0, 4))
+        ctk.CTkButton(quick, text="AS-0001", height=28, command=lambda: set_variant("AS-", 4, "Asset {value}\nLocation"), **_secondary_button_style()).grid(row=0, column=1, sticky="ew", padx=(4, 0), pady=(0, 4))
+        ctk.CTkButton(quick, text="Cable 01", height=28, command=lambda: set_variant("CBL-", 2, "Cable {value}\nTarget"), **_secondary_button_style()).grid(row=1, column=0, sticky="ew", padx=(0, 4))
+        ctk.CTkButton(quick, text="2026-0001", height=28, command=lambda: set_variant("2026-", 4, "{value}"), **_secondary_button_style()).grid(row=1, column=1, sticky="ew", padx=(4, 0))
+
+        ctk.CTkLabel(controls, text=self._t("sequence.template"), font=ctk.CTkFont(size=13, weight="bold"), text_color=COL_TEXT).grid(row=8, column=0, columnspan=2, sticky="w", padx=12, pady=(8, 2))
+        ctk.CTkLabel(controls, text=self._t("sequence.placeholder_hint"), justify="left", wraplength=290, text_color=COL_MUTED, font=ctk.CTkFont(size=10)).grid(row=9, column=0, columnspan=2, sticky="ew", padx=12, pady=(0, 4))
+        template_box = ctk.CTkTextbox(controls, height=92, fg_color="#ffffff", text_color=COL_TEXT, wrap="none")
+        template_box.grid(row=10, column=0, columnspan=2, sticky="ew", padx=12, pady=(0, 8))
+        template_box.insert("1.0", default_template)
+        template_box.bind("<KeyRelease>", lambda _: update_preview())
+
+        ctk.CTkLabel(controls, text=self._t("sequence.code"), font=ctk.CTkFont(size=13, weight="bold"), text_color=COL_TEXT).grid(row=11, column=0, columnspan=2, sticky="w", padx=12, pady=(4, 2))
+        ctk.CTkCheckBox(controls, text=self._t("sequence.enable_code"), variable=enable_code_var, command=lambda: update_preview()).grid(row=12, column=1, sticky="w", padx=(0, 12), pady=5)
+        add_label(13, self._t("sequence.code_payload"))
+        code_mode_dd = ctk.CTkOptionMenu(controls, variable=code_mode_var, values=_sequence_barcode_mode_labels(self.lang), command=lambda _: update_preview())
+        code_mode_dd.grid(row=13, column=1, sticky="ew", padx=(0, 12), pady=5)
+        add_label(14, self._t("field.symbology"))
+        type_dd = ctk.CTkOptionMenu(controls, variable=type_var, values=BARCODE_TYPE_LABELS, command=lambda _: update_preview())
+        type_dd.grid(row=14, column=1, sticky="ew", padx=(0, 12), pady=5)
+        add_label(15, self._t("field.position"))
+        pos_dd = ctk.CTkOptionMenu(controls, variable=pos_var, values=_position_labels(self.lang), command=lambda _: update_preview())
+        pos_dd.grid(row=15, column=1, sticky="ew", padx=(0, 12), pady=5)
+
+        footer = ctk.CTkFrame(preview, fg_color="transparent")
+        footer.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 12))
+        footer.grid_columnconfigure(0, weight=1)
+        info_lbl = ctk.CTkLabel(footer, text="", text_color=COL_MUTED, font=ctk.CTkFont(size=11))
+        info_lbl.grid(row=0, column=0, sticky="w")
+
+        def build_options():
+            return normalize_number_sequence_options(
+                start=start_var.get(),
+                count=count_var.get(),
+                step=step_var.get(),
+                padding=padding_var.get(),
+                prefix=prefix_var.get(),
+                suffix=suffix_var.get(),
+                line_template=template_box.get("1.0", "end-1c"),
+                enable_barcode=enable_code_var.get(),
+                barcode_mode=_sequence_barcode_mode_key(self.lang, code_mode_var.get()) if enable_code_var.get() else "none",
+            )
+
+        def build_base() -> LabelSpec:
+            return replace(
+                self._read_spec(),
+                barcode_type=barcode_key_from_label(type_var.get()),
+                barcode_pos=_position_key(pos_var.get()),
+            )
+
+        def preview_text() -> str:
+            options = build_options()
+            values = generate_sequence_values(options)
+            lines: list[str] = [self._t("sequence.preview_count", count=options.count), ""]
+            for index, value in enumerate(values[:8]):
+                number = options.start + index * options.step
+                lines.append(f"#{index + 1}: {value}")
+                rendered = render_sequence_lines(options.line_template, value=value, number=number, index=index)
+                lines.extend(f"  {line}" for line in rendered)
+                lines.append("")
+            if options.count > 8:
+                lines.append(self._t("sequence.more_preview", count=options.count - 8))
+            return "\n".join(lines).rstrip()
+
+        def update_preview() -> None:
+            if self._sequence_preview_box is None:
+                return
+            self._sequence_preview_box.configure(state="normal")
+            self._sequence_preview_box.delete("1.0", "end")
+            try:
+                text = preview_text()
+                info_lbl.configure(text=self._t("sequence.ready"), text_color=COL_MUTED)
+                self._sequence_preview_box.configure(text_color=COL_TEXT)
+            except (NumberSequenceError, LabelSpecError, ValueError) as exc:
+                text = str(exc)
+                info_lbl.configure(text=self._t("message.input_error", error=""), text_color=COL_ERR)
+                self._sequence_preview_box.configure(text_color=COL_ERR)
+            self._sequence_preview_box.insert("1.0", text)
+            self._sequence_preview_box.configure(state="disabled")
+
+        def copy_zpl() -> None:
+            try:
+                zpl = generate_number_sequence_zpl(build_base(), build_options())
+            except (NumberSequenceError, LabelSpecError, ValueError) as exc:
+                messagebox.showwarning(self._t("dialog.number_sequence"), str(exc), parent=win)
+                return
+            self.clipboard_clear()
+            self.clipboard_append(zpl)
+            self._status(self._t("status.sequence_copied"), COL_SUCCESS)
+
+        def export_zpl() -> None:
+            try:
+                zpl = generate_number_sequence_zpl(build_base(), build_options())
+            except (NumberSequenceError, LabelSpecError, ValueError) as exc:
+                messagebox.showwarning(self._t("dialog.number_sequence"), str(exc), parent=win)
+                return
+            path = filedialog.asksaveasfilename(parent=win, title=self._t("sequence.export"), defaultextension=".zpl", filetypes=[("ZPL files", "*.zpl"), ("Text files", "*.txt"), ("All files", "*.*")])
+            if not path:
+                return
+            try:
+                with open(path, "w", encoding="utf-8", newline="\n") as file:
+                    file.write(zpl)
+                    file.write("\n")
+            except OSError as exc:
+                messagebox.showerror(self._t("message.export_failed"), str(exc), parent=win)
+                return
+            self._status(self._t("status.sequence_exported"), COL_SUCCESS)
+
+        def apply_first() -> None:
+            try:
+                first = build_number_sequence_specs(build_base(), build_options())[0]
+            except (NumberSequenceError, LabelSpecError, ValueError, IndexError) as exc:
+                messagebox.showwarning(self._t("dialog.number_sequence"), str(exc), parent=win)
+                return
+            self._apply_setting_values(self._spec_to_settings(first))
+            self._status(self._t("status.sequence_first_applied"), COL_SUCCESS)
+
+        ctk.CTkButton(footer, text=self._t("sequence.apply_first"), command=apply_first, **_secondary_button_style()).grid(row=0, column=1, padx=(0, 6))
+        ctk.CTkButton(footer, text=self._t("sequence.copy_zpl"), command=copy_zpl).grid(row=0, column=2, padx=(0, 6))
+        ctk.CTkButton(footer, text=self._t("sequence.export"), command=export_zpl, **_secondary_button_style()).grid(row=0, column=3, padx=(0, 6))
+        ctk.CTkButton(footer, text=self._t("action.close"), command=self._close_number_sequence_window, **_secondary_button_style()).grid(row=0, column=4)
+        update_preview()
+
+    def _close_number_sequence_window(self) -> None:
+        if self._sequence_window is not None:
+            self._sequence_window.destroy()
+        self._sequence_window = None
+        self._sequence_preview_box = None
+
     def _open_batch_window(self, _=None) -> None:
         if self._batch_window is not None and self._batch_window.winfo_exists():
             self._batch_window.focus()
@@ -1571,6 +1803,11 @@ class ZebraApp(ctk.CTk):
         try:
             if self._batch_window is not None and self._batch_window.winfo_exists():
                 self._batch_window.destroy()
+        except Exception:
+            pass
+        try:
+            if self._sequence_window is not None and self._sequence_window.winfo_exists():
+                self._sequence_window.destroy()
         except Exception:
             pass
         self.destroy()

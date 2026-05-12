@@ -18,6 +18,7 @@ The project should stay small and technician-friendly. New features should reduc
 - Built-in label presets with input dialogs for barcode/QR payloads
 - Text cleanup tools
 - Batch ZPL generation from pasted text blocks
+- Number sequence generation for serial labels, assets, cables, storage bins, and other numbered runs
 - Linear barcode and 2D-code support: Code 128, Code 39, EAN-13, UPC-A, QR Code, Data Matrix, PDF417
 - Cleaner light UI with barcode/label setup moved out of the main panel
 - Persistent English/German language selection
@@ -32,12 +33,12 @@ The project should stay small and technician-friendly. New features should reduc
 - Add network printer backend for TCP port 9100
 - Add printer diagnostics before sending RAW data
 
-## Batch workflows
+## Batch and sequence workflows
 
 - CSV import
 - Batch preview before print/export
 - Batch print safeguards and confirmation summary
-- Template variables such as `{serial}`, `{date}`, `{row}`
+- CSV/table variables such as `{date}` and `{row}`
 - Table-style editor for batch labels
 
 ## Printing backends

@@ -7,6 +7,7 @@ import sys
 
 from .barcodes import BARCODE_TYPES
 from .label_spec import LabelSpec, LabelSpecError
+from .number_sequences import NumberSequenceError, generate_number_sequence_zpl, normalize_number_sequence_options
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -34,6 +35,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--barcode-height", type=str, default="40", help="Linear barcode height or reserved 2D-code area in dots")
     parser.add_argument("--hide-barcode-text", action="store_true", help="Hide human-readable text below linear barcodes")
     parser.add_argument("--barcode-magnification", type=str, default="4", help="QR/Data Matrix module magnification")
+
+    parser.add_argument("--sequence-count", type=str, default="0", help="Generate a numbered label series instead of one label")
+    parser.add_argument("--sequence-start", type=str, default="1", help="First number for --sequence-count")
+    parser.add_argument("--sequence-step", type=str, default="1", help="Step between numbers for --sequence-count")
+    parser.add_argument("--sequence-padding", type=str, default="3", help="Zero-padding width for generated numbers")
+    parser.add_argument("--sequence-prefix", default="", help="Text before each generated number")
+    parser.add_argument("--sequence-suffix", default="", help="Text after each generated number")
+    parser.add_argument("--sequence-template", default="", help="Text template for each numbered label. Supports {value}, {raw}, {index}, {index0}.")
+    parser.add_argument("--sequence-enable-barcode", action="store_true", help="Enable barcode/QR for every generated number label")
+    parser.add_argument("--sequence-barcode-mode", choices=["none", "value", "first_line", "all_text"], default="value", help="Barcode payload source for numbered labels")
     return parser
 
 
@@ -71,6 +82,36 @@ def main(argv: list[str] | None = None) -> int:
     except LabelSpecError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+
+    try:
+        sequence_count = int(str(args.sequence_count).strip())
+    except ValueError:
+        print("error: Sequence count must be a whole number", file=sys.stderr)
+        return 2
+
+    if sequence_count < 0:
+        print("error: Sequence count must be at least 0", file=sys.stderr)
+        return 2
+
+    if sequence_count > 0:
+        template = args.sequence_template or "\n".join(lines)
+        try:
+            options = normalize_number_sequence_options(
+                start=args.sequence_start,
+                count=args.sequence_count,
+                step=args.sequence_step,
+                padding=args.sequence_padding,
+                prefix=args.sequence_prefix,
+                suffix=args.sequence_suffix,
+                line_template=template,
+                enable_barcode=args.sequence_enable_barcode,
+                barcode_mode=args.sequence_barcode_mode if args.sequence_enable_barcode else "none",
+            )
+            print(generate_number_sequence_zpl(spec, options))
+        except NumberSequenceError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        return 0
 
     print(spec.to_zpl())
     return 0

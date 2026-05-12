@@ -23,3 +23,40 @@ def test_cli_generates_qr_code(capsys):
     assert exit_code == 0
     assert "^BQN,2,5" in captured.out
     assert "^FDLA,DEV-1^FS" in captured.out
+
+
+def test_cli_can_generate_numbered_series(capsys):
+    exit_code = main([
+        "Asset {value}",
+        "Shelf A",
+        "--sequence-count",
+        "2",
+        "--sequence-start",
+        "7",
+        "--sequence-padding",
+        "3",
+        "--sequence-prefix",
+        "AS-",
+    ])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.out.count("^XA") == 2
+    assert "Asset AS-007" in captured.out
+    assert "Asset AS-008" in captured.out
+
+
+def test_cli_sequence_can_generate_barcodes_from_values(capsys):
+    exit_code = main([
+        "Asset {value}",
+        "--barcode-type",
+        "code128",
+        "--sequence-count",
+        "1",
+        "--sequence-enable-barcode",
+        "--sequence-barcode-mode",
+        "value",
+    ])
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "^BCN" in captured.out
+    assert "^FD001^FS" in captured.out

@@ -4,6 +4,9 @@
 
 ### Added
 
+- Number sequence tool for generated label runs with start/count/step, zero-padding, prefix/suffix, multi-line templates, quick variants, barcode/QR payload modes, first-label apply, clipboard copy, and `.zpl` export.
+- CLI number sequence options for generating serial/asset/cable label runs without opening the GUI.
+
 - Dedicated button color tokens so secondary buttons no longer blend into card/background colors.
 - Main-window layout profile dropdown for common text/code arrangements such as text-only, code right, code left, barcode below, and code above.
 - Additional German UI translations for menus, dialogs, help text, status messages, batch labels, templates, built-in preset names/fields, and ZPL tools.

@@ -15,3 +15,12 @@ def test_i18n_supports_english_and_german():
 def test_i18n_falls_back_to_english_for_unknown_language():
     assert normalize_language("fr") == "en"
     assert translate("fr", "menu.file") == "File"
+
+
+def test_number_sequence_translations_exist_in_english_and_german():
+    from zebra_label_tool.i18n import translate
+
+    assert translate("en", "action.number_sequence") == "Number sequence..."
+    assert translate("de", "action.number_sequence") == "Zahlenreihe..."
+    assert translate("en", "sequence.barcode_mode.value") == "Generated number"
+    assert translate("de", "sequence.barcode_mode.value") == "Erzeugte Nummer"

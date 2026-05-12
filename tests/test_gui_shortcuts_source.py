@@ -71,3 +71,18 @@ def test_layout_profile_control_is_available_in_main_gui():
     assert "self.layout_profile_dd" in source
     assert "def _apply_layout_profile" in source
     assert "layout_profile.code_right" in source
+
+
+def test_number_sequence_tool_is_menu_based_and_shortcut_visible():
+    source = _source()
+    assert "def _open_number_sequence_window" in source
+    assert 'accelerator="Ctrl+Shift+N"' in source
+    assert "action.number_sequence" in source
+    assert "generate_number_sequence_zpl" in source
+
+
+def test_number_sequence_tool_uses_visible_button_styles():
+    source = _source()
+    assert "sequence.copy_zpl" in source
+    assert "sequence.export" in source
+    assert "COL_CARD" in source  # cards are allowed for frames, not buttons; contrast test covers buttons.

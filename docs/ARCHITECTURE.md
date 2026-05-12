@@ -19,6 +19,7 @@ These modules are covered by tests and can run on every platform.
 - `presets.py` contains built-in preset definitions, fill-in field metadata, and placeholder rendering. Presets remain data-driven so they can later become user-shareable templates.
 - `text_tools.py` contains deterministic text cleanup and formatting helpers used by the GUI.
 - `batch.py` converts pasted text blocks into multiple `LabelSpec` instances and one combined ZPL stream.
+- `number_sequences.py` creates numbered label series from one base `LabelSpec`, including prefix/suffix, zero-padding, step size, multi-line text templates, and optional per-label barcode/QR payload generation.
 
 These helpers are intentionally GUI-free so they are easy to test and extend.
 
@@ -33,6 +34,7 @@ Advanced or less frequent operations live behind top-level menus and small windo
 - Barcode / QR options
 - Generated ZPL
 - Batch labels
+- Number sequence labels
 - Text cleanup and wrapping
 
 The preview uses the same layout calculation as the ZPL generator. This prevents preview and printer output from drifting apart for the supported simple label model.
