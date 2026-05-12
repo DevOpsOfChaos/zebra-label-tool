@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Added an experimental modern Tauri desktop client under `desktop/`.
+- Added workflow-mode UI for text, text+code, code-only, number sequences, number sequences with code, and batch labels.
+- Added frontend ZPL generation and real barcode/2D-code preview through `bwip-js`.
+- Added a small Tauri Python bridge for printer discovery and RAW ZPL printing through the existing Python backend.
+- Added documentation for the new Tauri desktop track.
+
+
+## Unreleased
+
 ### Added
 
 - Main-window mode selector for Text, Text + Code, Code only + caption, Number sequence, Number sequence + Code, and Batch labels.

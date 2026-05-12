@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Default desktop permissions for the Zebra Label Tool Tauri client.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

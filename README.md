@@ -20,13 +20,14 @@ Zebra Label Tool focuses on a small workflow:
 
 ## Current status
 
-Early public prototype. The core ZPL/layout logic is separated and tested. The desktop UI is now focused on the daily workflow, while advanced options live in top-level menus instead of crowding the main window.
+Early public prototype. The Python/CustomTkinter desktop UI remains the stable baseline. A new modern Tauri client lives under `desktop/` as the next UI direction and is intentionally designed around workflow modes instead of the old Tkinter layout.
 
 Windows RAW printing is supported through `pywin32`. On non-Windows systems the ZPL generator and CLI can still be used, but direct printer discovery/printing is disabled.
 
 ## Features
 
-- Mode-based main GUI for Text, Text + Code, Code only + caption, Number sequence, Number sequence + Code, and Batch workflows
+- Mode-based Python GUI for Text, Text + Code, Code only + caption, Number sequence, Number sequence + Code, and Batch workflows
+- Experimental modern Tauri client under `desktop/` with a clean WebView UI, workflow cards, real barcode preview through `bwip-js`, and a Python print bridge
 - Multi-line label text editor
 - Live canvas preview using the same layout calculation as the ZPL generator
 - ZPL generation for Zebra-compatible printers
@@ -72,6 +73,18 @@ Suggested future files:
 - `docs/screenshots/main-window.png`
 - `docs/screenshots/preview-example.png`
 - `docs/screenshots/windows-printer-selection.png`
+
+## Tauri desktop client
+
+The repository also contains a modern Tauri desktop client in `desktop/`. It is the intended next UI direction and does not reuse the old Tkinter layout.
+
+```powershell
+cd desktop
+npm install
+npm run tauri dev
+```
+
+For details, see [`docs/TAURI_DESKTOP.md`](docs/TAURI_DESKTOP.md). Tauri development requires Node.js and Rust. On Windows, Tauri also requires Microsoft C++ Build Tools and WebView2.
 
 ## Installation from source
 
@@ -157,8 +170,9 @@ python -m zebra_label_tool "Motor" "230 V" --alignment left --rotation normal --
 ## Project structure
 
 ```text
+desktop/        # modern Tauri desktop client
 src/zebra_label_tool/
-  app.py        # CustomTkinter desktop app
+  app.py        # CustomTkinter desktop app / stable baseline
   barcodes.py   # barcode/QR metadata, aliases and payload validation
   batch.py      # batch label ZPL helpers
   cli.py        # command line ZPL generation
@@ -190,6 +204,8 @@ The ZPL/layout modules should remain GUI-free and printer-free. That is the main
 
 Near-term:
 
+- Manually verify the Tauri client on Windows
+- Decide Tauri packaging strategy for Python printing backend
 - Add real screenshots
 - Add packaged Windows release build
 - Add network printer backend for TCP port 9100

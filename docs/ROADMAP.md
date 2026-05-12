@@ -73,3 +73,12 @@ Next layout improvements:
 - optional fixed QR size in millimetres,
 - better Data Matrix/PDF417 local rendering,
 - reusable user-defined label composition templates.
+
+
+## Tauri UI track
+
+- Run the new `desktop/` client on Windows with a real Zebra-compatible printer.
+- Add screenshots from the Tauri client after visual review.
+- Add parity tests between TypeScript ZPL output and Python ZPL output for core examples.
+- Decide whether production packaging should bundle Python, call an installed Python package, or move printing into Rust.
+- Replace or retire the Tkinter UI only after the Tauri workflow is manually validated.

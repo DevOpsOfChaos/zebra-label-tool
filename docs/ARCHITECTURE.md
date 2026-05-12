@@ -39,6 +39,15 @@ Advanced or less frequent operations live behind top-level menus and small windo
 
 The preview uses the same layout calculation as the ZPL generator. This prevents preview and printer output from drifting apart for the supported simple label model.
 
+
+## Tauri client boundary
+
+`desktop/` contains a new Tauri/WebView client. It is intentionally not a skin over the Tkinter window. The UI is rebuilt around workflow modes, card-based controls, collapsible settings, a modern preview pane, and frontend-side ZPL generation for immediate feedback.
+
+The current Tauri backend exposes two small commands: printer discovery and RAW ZPL printing. Both commands bridge into the existing Python `printing.py` module during development. This keeps printer behavior consistent while the UI is being redesigned. Packaging Python with Tauri remains a separate release-engineering decision.
+
+The Tauri frontend may evolve faster than the Python GUI, but the Python core stays the source of truth for tested label generation until parity tests between the TypeScript and Python generators are added.
+
 ## Printing boundary
 
 `printing.py` currently implements Windows RAW printing through `pywin32`. Future printer backends, such as TCP port 9100 network printing, should be added behind this boundary instead of being mixed into the UI.

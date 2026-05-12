@@ -28,3 +28,10 @@ settings.json
 .idea/
 .DS_Store
 Thumbs.db
+
+# Tauri / frontend
+node_modules/
+desktop/node_modules/
+desktop/dist/
+desktop/.vite/
+desktop/src-tauri/target/
