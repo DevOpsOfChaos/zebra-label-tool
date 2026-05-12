@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Fixed Tauri text-entry focus loss by restoring the active input/caret after live preview rerenders.
+- Added Tauri text-placement controls for top/middle/bottom and left/center/right combinations, with matching ZPL layout output.
+
 - Added quick workflow profiles to the Tauri client for common text, device QR, asset QR, centered QR, cable sequence, and box batch setups.
 - Added compact/comfortable density switching, hidden-by-default ZPL panel, preview zoom controls, and more advanced text/code tools behind collapsible sections.
 - Added collapsible Tauri sidebar to give the preview more room on normal laptop screens.

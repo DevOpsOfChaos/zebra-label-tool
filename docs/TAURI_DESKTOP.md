@@ -98,3 +98,8 @@ The Tauri client supports numeric, letter-based, and mixed letter/number sequenc
 ## UI workflow polish
 
 The Tauri client now uses progressive disclosure: workflow modes stay visible, printer/label settings are stable in the left sidebar, detailed controls live inside collapsible sections, common label templates are available on demand, ZPL copy/export live in the preview header, and the sidebar can fully collapse when more preview room is needed.
+
+
+## Text placement and live editing
+
+The Tauri client keeps the active input focused while live preview rerenders, so typing in text, code, and sequence fields should not require re-clicking the field after every character. Text placement is controlled through horizontal alignment and vertical top/middle/bottom positioning; the same values are used by preview and ZPL generation.

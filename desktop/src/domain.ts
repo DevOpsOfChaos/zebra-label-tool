@@ -6,6 +6,7 @@ export type BarcodeType = 'code128' | 'code39' | 'ean13' | 'upca' | 'qrcode' | '
 export type CodePosition = 'below' | 'above' | 'right' | 'left' | 'center';
 export type BarcodeMode = 'none' | 'value' | 'first_line' | 'all_text' | 'template';
 export type Alignment = 'left' | 'center' | 'right';
+export type TextVerticalAlign = 'top' | 'middle' | 'bottom';
 export type SequenceKind = 'number' | 'letters' | 'mixed';
 
 export interface SequenceState {
@@ -43,6 +44,7 @@ export interface AppState {
   caption: string;
   fontSize: number;
   alignment: Alignment;
+  textVerticalAlign: TextVerticalAlign;
   autoFit: boolean;
   lineGap: number;
   codeEnabled: boolean;

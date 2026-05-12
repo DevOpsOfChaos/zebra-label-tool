@@ -14,6 +14,7 @@ import {
   type CodePosition,
   type Language,
   type Theme,
+  type TextVerticalAlign,
   type WorkflowMode,
 } from './domain';
 import { modeLabel, t } from './i18n';
@@ -41,6 +42,7 @@ const defaultState: AppState = {
   caption: 'Device link',
   fontSize: 54,
   alignment: 'center',
+  textVerticalAlign: 'middle',
   autoFit: true,
   lineGap: 10,
   codeEnabled: true,
@@ -69,6 +71,27 @@ const defaultState: AppState = {
 
 let state: AppState = loadState();
 
+type RenderOptions = { restoreFocus?: boolean };
+type FocusSnapshot = { id: string; start: number | null; end: number | null; scrollTop: number };
+
+function captureFocus(): FocusSnapshot | null {
+  const active = document.activeElement as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+  if (!active?.id) return null;
+  if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName)) return null;
+  return { id: active.id, start: 'selectionStart' in active ? active.selectionStart : null, end: 'selectionEnd' in active ? active.selectionEnd : null, scrollTop: 'scrollTop' in active ? active.scrollTop : 0 };
+}
+
+function restoreFocus(snapshot: FocusSnapshot | null): void {
+  if (!snapshot) return;
+  const next = document.getElementById(snapshot.id) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+  if (!next) return;
+  next.focus({ preventScroll: true });
+  if ('setSelectionRange' in next && snapshot.start !== null && snapshot.end !== null) {
+    try { next.setSelectionRange(snapshot.start, snapshot.end); } catch { /* Selects cannot restore caret. */ }
+  }
+  if ('scrollTop' in next) next.scrollTop = snapshot.scrollTop;
+}
+
 function loadState(): AppState {
   try {
     const raw = localStorage.getItem(storageKey);
@@ -83,16 +106,20 @@ function saveState(): void {
   localStorage.setItem(storageKey, JSON.stringify({ ...state, printers: [] }));
 }
 
-function setState(patch: Partial<AppState>): void {
+function setState(patch: Partial<AppState>, options: RenderOptions = {}): void {
+  const focus = options.restoreFocus ? captureFocus() : null;
   state = { ...state, ...patch };
   saveState();
-  render();
+  render(options);
+  restoreFocus(focus);
 }
 
-function setSequence<K extends keyof AppState['sequence']>(key: K, value: AppState['sequence'][K]): void {
+function setSequence<K extends keyof AppState['sequence']>(key: K, value: AppState['sequence'][K], options: RenderOptions = {}): void {
+  const focus = options.restoreFocus ? captureFocus() : null;
   state = { ...state, sequence: { ...state.sequence, [key]: value } };
   saveState();
-  render();
+  render(options);
+  restoreFocus(focus);
 }
 
 function numberValue(id: string, fallback: number): number {
@@ -115,7 +142,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function render(): void {
+function render(_options: RenderOptions = {}): void {
   document.body.classList.toggle('dark', state.theme === 'dark');
   document.body.classList.toggle('compact', state.density === 'compact');
   const app = document.getElementById('app');
@@ -255,6 +282,18 @@ function renderTextPanel(): string {
           ${numberField('fontSize', t(state.language, 'font'), state.fontSize, 8, 160)}
           ${numberField('lineGap', t(state.language, 'lineGap'), state.lineGap, 0, 80)}
           <div class="field"><label>${t(state.language, 'alignment')}</label><select id="alignment"><option value="left" ${state.alignment === 'left' ? 'selected' : ''}>${t(state.language, 'left')}</option><option value="center" ${state.alignment === 'center' ? 'selected' : ''}>${t(state.language, 'center')}</option><option value="right" ${state.alignment === 'right' ? 'selected' : ''}>${t(state.language, 'right')}</option></select></div>
+          <div class="field"><label>${t(state.language, 'verticalPosition')}</label><select id="textVerticalAlign"><option value="top" ${state.textVerticalAlign === 'top' ? 'selected' : ''}>${t(state.language, 'top')}</option><option value="middle" ${state.textVerticalAlign === 'middle' ? 'selected' : ''}>${t(state.language, 'middle')}</option><option value="bottom" ${state.textVerticalAlign === 'bottom' ? 'selected' : ''}>${t(state.language, 'bottom')}</option></select></div>
+        </div>
+        <div class="text-position-presets pill-row" aria-label="${t(state.language, 'textPositionPresets')}">
+          <button class="pill ${state.alignment === 'left' && state.textVerticalAlign === 'top' ? 'active' : ''}" data-text-place="top-left">↖</button>
+          <button class="pill ${state.alignment === 'center' && state.textVerticalAlign === 'top' ? 'active' : ''}" data-text-place="top-center">↑</button>
+          <button class="pill ${state.alignment === 'right' && state.textVerticalAlign === 'top' ? 'active' : ''}" data-text-place="top-right">↗</button>
+          <button class="pill ${state.alignment === 'left' && state.textVerticalAlign === 'middle' ? 'active' : ''}" data-text-place="middle-left">←</button>
+          <button class="pill ${state.alignment === 'center' && state.textVerticalAlign === 'middle' ? 'active' : ''}" data-text-place="middle-center">•</button>
+          <button class="pill ${state.alignment === 'right' && state.textVerticalAlign === 'middle' ? 'active' : ''}" data-text-place="middle-right">→</button>
+          <button class="pill ${state.alignment === 'left' && state.textVerticalAlign === 'bottom' ? 'active' : ''}" data-text-place="bottom-left">↙</button>
+          <button class="pill ${state.alignment === 'center' && state.textVerticalAlign === 'bottom' ? 'active' : ''}" data-text-place="bottom-center">↓</button>
+          <button class="pill ${state.alignment === 'right' && state.textVerticalAlign === 'bottom' ? 'active' : ''}" data-text-place="bottom-right">↘</button>
         </div>
         <div class="checkbox-row tight-row">
           <label><input id="autoFit" type="checkbox" ${state.autoFit ? 'checked' : ''}> ${t(state.language, 'autoFit')}</label>
@@ -452,36 +491,37 @@ function bindEvents(): void {
   bindInput('language', () => setState({ language: stringValue('language', 'de') as Language }));
   bindInput('theme', () => setState({ theme: stringValue('theme', 'light') as Theme }));
   bindInput('density', () => setState({ density: stringValue('density', 'compact') as Density }));
-  bindInput('widthMm', () => setState({ widthMm: clamp(numberValue('widthMm', state.widthMm), 1, 500) }));
-  bindInput('heightMm', () => setState({ heightMm: clamp(numberValue('heightMm', state.heightMm), 1, 500) }));
+  bindInput('widthMm', () => setState({ widthMm: clamp(numberValue('widthMm', state.widthMm), 1, 500) }, { restoreFocus: true }));
+  bindInput('heightMm', () => setState({ heightMm: clamp(numberValue('heightMm', state.heightMm), 1, 500) }, { restoreFocus: true }));
   bindInput('dpi', () => setState({ dpi: numberValue('dpi', state.dpi) }));
-  bindInput('copies', () => setState({ copies: clamp(numberValue('copies', state.copies), 1, 999) }));
+  bindInput('copies', () => setState({ copies: clamp(numberValue('copies', state.copies), 1, 999) }, { restoreFocus: true }));
   bindInput('border', () => setState({ border: boolValue('border') }));
   bindInput('inverted', () => setState({ inverted: boolValue('inverted') }));
-  bindInput('textInput', () => setState({ text: stringValue('textInput') }));
-  bindInput('fontSize', () => setState({ fontSize: clamp(numberValue('fontSize', state.fontSize), 8, 160) }));
-  bindInput('lineGap', () => setState({ lineGap: clamp(numberValue('lineGap', state.lineGap), 0, 80) }));
+  bindInput('textInput', () => setState({ text: stringValue('textInput') }, { restoreFocus: true }));
+  bindInput('fontSize', () => setState({ fontSize: clamp(numberValue('fontSize', state.fontSize), 8, 160) }, { restoreFocus: true }));
+  bindInput('lineGap', () => setState({ lineGap: clamp(numberValue('lineGap', state.lineGap), 0, 80) }, { restoreFocus: true }));
   bindInput('alignment', () => setState({ alignment: stringValue('alignment', 'center') as AppState['alignment'] }));
+  bindInput('textVerticalAlign', () => setState({ textVerticalAlign: stringValue('textVerticalAlign', 'middle') as TextVerticalAlign }));
   bindInput('autoFit', () => setState({ autoFit: boolValue('autoFit') }));
   bindInput('codeType', () => setState({ codeType: stringValue('codeType', 'qrcode') as BarcodeType }));
   bindInput('codePosition', () => setState({ codePosition: stringValue('codePosition', 'right') as CodePosition }));
-  bindInput('codeArea', () => setState({ codeArea: clamp(numberValue('codeArea', state.codeArea), 30, 260) }));
-  bindInput('codeMagnification', () => setState({ codeMagnification: clamp(numberValue('codeMagnification', state.codeMagnification), 1, 10) }));
-  bindInput('codeContent', () => setState({ codeContent: stringValue('codeContent') }));
+  bindInput('codeArea', () => setState({ codeArea: clamp(numberValue('codeArea', state.codeArea), 30, 260) }, { restoreFocus: true }));
+  bindInput('codeMagnification', () => setState({ codeMagnification: clamp(numberValue('codeMagnification', state.codeMagnification), 1, 10) }, { restoreFocus: true }));
+  bindInput('codeContent', () => setState({ codeContent: stringValue('codeContent') }, { restoreFocus: true }));
   bindInput('barcodeMode', () => setSequence('barcodeMode', stringValue('barcodeMode', 'value') as BarcodeMode));
-  bindInput('seqBarcodeTemplate', () => setSequence('barcodeTemplate', stringValue('seqBarcodeTemplate', state.sequence.barcodeTemplate)));
-  bindInput('seqValuePattern', () => setSequence('valuePattern', stringValue('seqValuePattern', state.sequence.valuePattern)));
+  bindInput('seqBarcodeTemplate', () => setSequence('barcodeTemplate', stringValue('seqBarcodeTemplate', state.sequence.barcodeTemplate), { restoreFocus: true }));
+  bindInput('seqValuePattern', () => setSequence('valuePattern', stringValue('seqValuePattern', state.sequence.valuePattern), { restoreFocus: true }));
   bindInput('showBarcodeText', () => setState({ showBarcodeText: boolValue('showBarcodeText') }));
   bindInput('seqKind', () => setSequence('kind', stringValue('seqKind', 'number') as AppState['sequence']['kind']));
-  bindInput('seqStart', () => setSequence('start', numberValue('seqStart', state.sequence.start)));
-  bindInput('seqLetterStart', () => setSequence('letterStart', stringValue('seqLetterStart', state.sequence.letterStart).toUpperCase()));
-  bindInput('seqCount', () => setSequence('count', clamp(numberValue('seqCount', state.sequence.count), 1, 500)));
-  bindInput('seqStep', () => setSequence('step', numberValue('seqStep', state.sequence.step) || 1));
-  bindInput('seqPadding', () => setSequence('padding', clamp(numberValue('seqPadding', state.sequence.padding), 0, 12)));
-  bindInput('seqPrefix', () => setSequence('prefix', stringValue('seqPrefix')));
-  bindInput('seqSuffix', () => setSequence('suffix', stringValue('seqSuffix')));
-  bindInput('seqTemplate', () => setSequence('template', stringValue('seqTemplate')));
-  bindInput('batchText', () => setState({ batchText: stringValue('batchText') }));
+  bindInput('seqStart', () => setSequence('start', numberValue('seqStart', state.sequence.start), { restoreFocus: true }));
+  bindInput('seqLetterStart', () => setSequence('letterStart', stringValue('seqLetterStart', state.sequence.letterStart).toUpperCase(), { restoreFocus: true }));
+  bindInput('seqCount', () => setSequence('count', clamp(numberValue('seqCount', state.sequence.count), 1, 500), { restoreFocus: true }));
+  bindInput('seqStep', () => setSequence('step', numberValue('seqStep', state.sequence.step) || 1, { restoreFocus: true }));
+  bindInput('seqPadding', () => setSequence('padding', clamp(numberValue('seqPadding', state.sequence.padding), 0, 12), { restoreFocus: true }));
+  bindInput('seqPrefix', () => setSequence('prefix', stringValue('seqPrefix'), { restoreFocus: true }));
+  bindInput('seqSuffix', () => setSequence('suffix', stringValue('seqSuffix'), { restoreFocus: true }));
+  bindInput('seqTemplate', () => setSequence('template', stringValue('seqTemplate'), { restoreFocus: true }));
+  bindInput('batchText', () => setState({ batchText: stringValue('batchText') }, { restoreFocus: true }));
 
   click('toggleSidebarBtn', () => setState({ sidebarCollapsed: !state.sidebarCollapsed }));
   click('refreshPrintersBtn', () => void refreshPrinters());
@@ -513,6 +553,12 @@ function bindEvents(): void {
   document.querySelectorAll<HTMLButtonElement>('[data-code-center]').forEach((button) => {
     button.addEventListener('click', () => setState({ codePosition: 'center' }));
   });
+  document.querySelectorAll<HTMLButtonElement>('[data-text-place]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const [vertical, horizontal] = (button.dataset.textPlace ?? 'middle-center').split('-');
+      setState({ alignment: horizontal as AppState['alignment'], textVerticalAlign: vertical as TextVerticalAlign });
+    });
+  });
   document.querySelectorAll<HTMLButtonElement>('[data-seq-preset]').forEach((button) => {
     button.addEventListener('click', () => applySequencePreset(button.dataset.seqPreset ?? '001'));
   });
@@ -536,19 +582,19 @@ function updateText(fn: (text: string) => string): void {
 
 function applyTemplate(name: string): void {
   if (name === 'device_qr') {
-    setState({ mode: 'text_code', widthMm: 57, heightMm: 25, text: 'Device\nESP32-Kitchen', codeType: 'qrcode', codeContent: 'https://example.local/device/esp32-kitchen', codePosition: 'right', codeArea: 120, codeMagnification: 5, fontSize: 42, alignment: 'left', border: false });
+    setState({ mode: 'text_code', widthMm: 57, heightMm: 25, text: 'Device\nESP32-Kitchen', codeType: 'qrcode', codeContent: 'https://example.local/device/esp32-kitchen', codePosition: 'right', codeArea: 120, codeMagnification: 5, fontSize: 42, alignment: 'left', textVerticalAlign: 'middle', border: false });
   } else if (name === 'asset_qr') {
-    setState({ mode: 'text_code', widthMm: 62, heightMm: 29, text: 'Asset AS-0001\nRack A', codeType: 'qrcode', codeContent: 'asset:AS-0001', codePosition: 'right', codeArea: 115, codeMagnification: 5, fontSize: 38, alignment: 'left', border: true });
+    setState({ mode: 'text_code', widthMm: 62, heightMm: 29, text: 'Asset AS-0001\nRack A', codeType: 'qrcode', codeContent: 'asset:AS-0001', codePosition: 'right', codeArea: 115, codeMagnification: 5, fontSize: 38, alignment: 'left', textVerticalAlign: 'middle', border: true });
   } else if (name === 'wifi_qr') {
-    setState({ mode: 'text_code', widthMm: 70, heightMm: 35, text: 'Wi-Fi\nWorkshop', codeType: 'qrcode', codeContent: 'WIFI:T:WPA;S:Workshop;P:change-me;;', codePosition: 'right', codeArea: 135, codeMagnification: 5, fontSize: 36, alignment: 'left', border: true });
+    setState({ mode: 'text_code', widthMm: 70, heightMm: 35, text: 'Wi-Fi\nWorkshop', codeType: 'qrcode', codeContent: 'WIFI:T:WPA;S:Workshop;P:change-me;;', codePosition: 'right', codeArea: 135, codeMagnification: 5, fontSize: 36, alignment: 'left', textVerticalAlign: 'middle', border: true });
   } else if (name === 'shelf_box') {
-    setState({ mode: 'text', widthMm: 57, heightMm: 19, text: 'Shelf A\nBox 01', codeContent: '', fontSize: 50, alignment: 'center', border: true });
+    setState({ mode: 'text', widthMm: 57, heightMm: 19, text: 'Shelf A\nBox 01', codeContent: '', fontSize: 50, alignment: 'center', textVerticalAlign: 'middle', border: true });
   } else if (name === 'cable_marker') {
     setState({ mode: 'sequence_code', widthMm: 57, heightMm: 19, codeType: 'code128', codePosition: 'below', codeArea: 55, codeMagnification: 3, fontSize: 30, alignment: 'center', sequence: { ...state.sequence, kind: 'mixed', count: 12, padding: 2, letterStart: 'A', start: 1, prefix: '', suffix: '', valuePattern: 'CB-{letter}-{number:00}', template: '{value}\nCable', barcodeMode: 'value', barcodeTemplate: '{value}' } });
   } else if (name === 'maintenance') {
-    setState({ mode: 'text_code', widthMm: 70, heightMm: 30, text: 'Service\nNext check', codeType: 'qrcode', codeContent: 'service:next-check', codePosition: 'right', codeArea: 120, codeMagnification: 5, fontSize: 36, alignment: 'left', border: true });
+    setState({ mode: 'text_code', widthMm: 70, heightMm: 30, text: 'Service\nNext check', codeType: 'qrcode', codeContent: 'service:next-check', codePosition: 'right', codeArea: 120, codeMagnification: 5, fontSize: 36, alignment: 'left', textVerticalAlign: 'middle', border: true });
   } else if (name === 'shipping') {
-    setState({ mode: 'text_code', widthMm: 100, heightMm: 50, text: 'Package\nOrder 1001', codeType: 'code128', codeContent: 'ORDER-1001', codePosition: 'below', codeArea: 80, codeMagnification: 3, fontSize: 50, alignment: 'center', border: true });
+    setState({ mode: 'text_code', widthMm: 100, heightMm: 50, text: 'Package\nOrder 1001', codeType: 'code128', codeContent: 'ORDER-1001', codePosition: 'below', codeArea: 80, codeMagnification: 3, fontSize: 50, alignment: 'center', textVerticalAlign: 'middle', border: true });
   }
 }
 

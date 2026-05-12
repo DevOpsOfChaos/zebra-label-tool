@@ -140,3 +140,27 @@ def test_tauri_mode_buttons_have_no_inline_explanations() -> None:
     main_ts = (DESKTOP / "src" / "main.ts").read_text(encoding="utf-8")
     assert "modeDescription" not in main_ts
     assert "<small>" not in main_ts
+
+
+def test_tauri_input_rerender_restores_focus_and_caret() -> None:
+    main_ts = (DESKTOP / "src" / "main.ts").read_text(encoding="utf-8")
+    assert "captureFocus" in main_ts
+    assert "restoreFocus" in main_ts
+    assert "setSelectionRange" in main_ts
+    assert "setState({ text: stringValue('textInput') }, { restoreFocus: true })" in main_ts
+    assert "setSequence('template', stringValue('seqTemplate'), { restoreFocus: true })" in main_ts
+
+
+def test_tauri_text_position_controls_drive_zpl_layout() -> None:
+    domain = (DESKTOP / "src" / "domain.ts").read_text(encoding="utf-8")
+    main_ts = (DESKTOP / "src" / "main.ts").read_text(encoding="utf-8")
+    zpl_ts = (DESKTOP / "src" / "zpl.ts").read_text(encoding="utf-8")
+    i18n = (DESKTOP / "src" / "i18n.ts").read_text(encoding="utf-8")
+    assert "TextVerticalAlign = 'top' | 'middle' | 'bottom'" in domain
+    assert "textVerticalAlign" in domain
+    assert 'id="textVerticalAlign"' in main_ts
+    assert 'data-text-place="top-left"' in main_ts
+    assert 'data-text-place="bottom-right"' in main_ts
+    assert "verticalTextY" in zpl_ts
+    assert "textVerticalAlign: state.textVerticalAlign" in zpl_ts
+    assert "verticalPosition" in i18n

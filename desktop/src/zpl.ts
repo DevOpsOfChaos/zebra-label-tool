@@ -1,4 +1,4 @@
-import type { Alignment, AppState, BarcodeMode, BarcodeType, CodePosition, SequenceState } from './domain';
+import type { Alignment, AppState, BarcodeMode, BarcodeType, CodePosition, SequenceState, TextVerticalAlign } from './domain';
 
 export interface LabelSpec {
   lines: string[];
@@ -10,6 +10,7 @@ export interface LabelSpec {
   inverted: boolean;
   fontSize: number;
   alignment: Alignment;
+  textVerticalAlign: TextVerticalAlign;
   autoFit: boolean;
   lineGap: number;
   barcode: boolean;
@@ -53,6 +54,14 @@ function alignmentCode(alignment: Alignment): string {
   return 'C';
 }
 
+function verticalTextY(verticalAlign: TextVerticalAlign, areaTop: number, areaHeight: number, textHeight: number): number {
+  const safeHeight = Math.max(0, areaHeight);
+  const safeTextHeight = Math.max(0, textHeight);
+  if (verticalAlign === 'top') return Math.max(4, Math.round(areaTop));
+  if (verticalAlign === 'bottom') return Math.max(4, Math.round(areaTop + safeHeight - safeTextHeight));
+  return Math.max(4, Math.round(areaTop + (safeHeight - safeTextHeight) / 2));
+}
+
 function codeHeight(spec: LabelSpec): number {
   const base = Math.max(24, Math.min(260, Math.round(spec.barcodeArea || 80)));
   if (['qrcode', 'datamatrix'].includes(spec.barcodeType)) {
@@ -72,6 +81,8 @@ export function calculateLayout(spec: LabelSpec) {
   let textX = margin;
   let textY = 4;
   let textW = Math.max(1, pw - margin * 2);
+  let textAreaTop = 4;
+  let textAreaH = Math.max(1, ll - 8);
   let barX = Math.round((pw - barW) / 2);
   let barY = Math.round((ll - barH) / 2);
 
@@ -87,11 +98,15 @@ export function calculateLayout(spec: LabelSpec) {
   const textH = hasVisibleText ? fs * lineCount + Math.max(0, spec.lineGap) * Math.max(0, lineCount - 1) : 0;
 
   if (!codeActive) {
-    textY = Math.max(4, Math.round((ll - textH) / 2));
+    textAreaTop = 4;
+    textAreaH = Math.max(1, ll - 8);
+    textY = verticalTextY(spec.textVerticalAlign, textAreaTop, textAreaH, textH);
   } else if (spec.barcodePosition === 'right') {
     textW = Math.max(1, pw - margin * 2 - barW - gap);
     textX = margin;
-    textY = Math.max(4, Math.round((ll - textH) / 2));
+    textAreaTop = 4;
+    textAreaH = Math.max(1, ll - 8);
+    textY = verticalTextY(spec.textVerticalAlign, textAreaTop, textAreaH, textH);
     barX = margin + textW + gap;
     barY = Math.max(2, Math.round((ll - barH) / 2));
   } else if (spec.barcodePosition === 'left') {
@@ -99,24 +114,37 @@ export function calculateLayout(spec: LabelSpec) {
     barY = Math.max(2, Math.round((ll - barH) / 2));
     textX = margin + barW + gap;
     textW = Math.max(1, pw - textX - margin);
-    textY = Math.max(4, Math.round((ll - textH) / 2));
+    textAreaTop = 4;
+    textAreaH = Math.max(1, ll - 8);
+    textY = verticalTextY(spec.textVerticalAlign, textAreaTop, textAreaH, textH);
   } else if (spec.barcodePosition === 'center') {
     barX = Math.max(2, Math.round((pw - barW) / 2));
-    barY = Math.max(2, Math.round((ll - barH - (hasVisibleText ? gap + textH : 0)) / 2));
+    if (hasVisibleText) {
+      const combinedH = barH + gap + textH;
+      const groupTop = verticalTextY(spec.textVerticalAlign, 4, Math.max(1, ll - 8), combinedH);
+      barY = Math.max(2, groupTop);
+      textY = Math.min(Math.max(4, barY + barH + gap), Math.max(4, ll - textH - 4));
+    } else {
+      barY = Math.max(2, Math.round((ll - barH) / 2));
+      textY = 4;
+    }
     textX = margin;
     textW = Math.max(1, pw - margin * 2);
-    textY = Math.min(Math.max(4, barY + barH + gap), Math.max(4, ll - textH - 4));
   } else if (spec.barcodePosition === 'above') {
     barX = Math.max(2, Math.round((pw - barW) / 2));
     barY = 4;
-    textY = Math.max(barY + barH + gap, Math.round((ll - textH) / 2));
+    textAreaTop = barY + barH + gap;
+    textAreaH = Math.max(1, ll - textAreaTop - 4);
+    textY = verticalTextY(spec.textVerticalAlign, textAreaTop, textAreaH, textH);
   } else {
-    textY = Math.max(4, Math.round((ll - barH - gap - textH) / 2));
+    textAreaTop = 4;
+    textAreaH = Math.max(1, ll - barH - gap - 8);
+    textY = verticalTextY(spec.textVerticalAlign, textAreaTop, textAreaH, textH);
     barX = Math.max(2, Math.round((pw - barW) / 2));
-    barY = Math.min(Math.max(2, textY + textH + gap), Math.max(2, ll - barH - 4));
+    barY = Math.min(Math.max(2, textAreaTop + textAreaH + gap), Math.max(2, ll - barH - 4));
   }
 
-  return { pw, ll, margin, fs, textX, textY, textW, barX, barY, barH, barW };
+  return { pw, ll, margin, fs, textX, textY, textW, textAreaTop, textAreaH, barX, barY, barH, barW };
 }
 
 function barcodeLines(spec: LabelSpec, x: number, y: number, h: number): string[] {
@@ -269,6 +297,7 @@ export function buildSpec(state: AppState, item: SequenceValue = sequenceItems(s
     inverted: state.inverted,
     fontSize: state.fontSize,
     alignment: state.alignment,
+    textVerticalAlign: state.textVerticalAlign,
     autoFit: state.autoFit,
     lineGap: state.lineGap,
     barcode: Boolean(codeActive && barcodeText.trim()),

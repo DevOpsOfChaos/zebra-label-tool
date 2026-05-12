@@ -28,6 +28,8 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 
 - Mode-based Python GUI for Text, Text + Code, Code only + caption, Number sequence, Number sequence + Code, and Batch workflows
 - Experimental modern Tauri client under `desktop/` with a clean WebView UI, workflow cards, real barcode preview through `bwip-js`, and a Python print bridge
+- Tauri text placement controls for top/middle/bottom and left/center/right label positioning
+- Tauri live editing keeps the active input focused while the preview updates
 - Multi-line label text editor
 - Live canvas preview using the same layout calculation as the ZPL generator
 - ZPL generation for Zebra-compatible printers
@@ -268,4 +270,4 @@ The Tauri client supports text labels, text + code labels, code-only labels, num
 
 ## UI workflow polish
 
-The Tauri client now uses progressive disclosure: common workflows are selected through modes, details live inside collapsible sections, adjustable templates are available on demand, ZPL actions sit in the preview header, and the sidebar can be fully collapsed so the preview has more room.
+The Tauri client now uses progressive disclosure: common workflows are selected through modes, details live inside collapsible sections, adjustable templates are available on demand, ZPL actions sit in the preview header, text placement can be controlled with horizontal/vertical presets, and the sidebar can be fully collapsed so the preview has more room.
