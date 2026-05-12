@@ -89,3 +89,8 @@ Next layout improvements:
 - Replace the temporary generated icon with a polished project logo before the first public packaged release.
 - Add visual screenshot documentation once the responsive desktop layout is manually reviewed on Windows.
 - Consider code-splitting `bwip-js` if the packaged frontend bundle becomes too large.
+
+
+## UI workflow polish
+
+The Tauri client now uses progressive disclosure: common workflows are available as quick profile buttons, advanced text/code tools live inside collapsible sections, ZPL is hidden by default until requested, and preview zoom controls help fit labels into smaller windows.

@@ -164,3 +164,83 @@ textarea { min-height: 86px; resize: vertical; line-height: 1.28; }
   .button { width: 100%; }
   .preview-stage { padding: 8px; }
 }
+
+.quick-strip {
+  display: grid;
+  gap: 7px;
+  background: color-mix(in srgb, var(--panel-strong) 88%, var(--primary) 12%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 9px;
+}
+.quick-strip strong { display: block; font-size: 13px; }
+.quick-strip span { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.quick-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.inline-advanced {
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  padding: 7px 9px;
+  background: color-mix(in srgb, var(--panel) 78%, var(--panel-strong) 22%);
+}
+.inline-advanced summary {
+  cursor: pointer;
+  font-weight: 760;
+  color: var(--text);
+  font-size: 12px;
+}
+.inline-advanced > *:not(summary) { margin-top: 8px; }
+.sequence-preview {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(15, 159, 143, 0.08);
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line) 66%);
+  border-radius: 12px;
+  padding: 7px 9px;
+  color: var(--text);
+  min-width: 0;
+}
+.sequence-preview strong { font-size: 12px; white-space: nowrap; }
+.sequence-preview span { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-tools { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; }
+.preview-tools .button { padding: 6px 8px; }
+.zpl-collapsed {
+  border: 1px dashed var(--line-strong);
+  background: rgba(100,116,139,0.08);
+  border-radius: 11px;
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+body.compact .app-shell { gap: 8px; padding: 8px; }
+body.compact .sidebar,
+body.compact .workspace,
+body.compact .preview-pane { border-radius: 14px; }
+body.compact .workspace,
+body.compact .preview-pane,
+body.compact .sidebar { padding: 8px; }
+body.compact .card-panel { padding: 8px; gap: 7px; }
+body.compact details.card { padding: 7px 8px; }
+body.compact textarea { min-height: 68px; }
+body.compact #seqTemplate,
+body.compact #batchText { min-height: 64px; }
+body.compact .preview-stage { min-height: 190px; padding: 8px; }
+body.compact .preview-pane { grid-template-rows: auto minmax(190px, 1fr) auto auto; }
+body.compact .button,
+body.compact .pill { padding: 6px 8px; font-size: 11px; }
+body.compact .input,
+body.compact textarea,
+body.compact select { min-height: 31px; padding: 6px 8px; }
+body.compact .mode-button { padding: 7px 8px; }
+body.compact .mode-button strong { font-size: 12px; }
+body.compact .mode-button small { font-size: 9px; }
+
+@media (max-width: 760px) {
+  .quick-strip { padding: 8px; }
+  .quick-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .quick-actions .pill { width: 100%; }
+  .preview-tools { justify-content: flex-start; }
+  .sequence-preview { align-items: flex-start; flex-direction: column; }
+  .sequence-preview span { white-space: normal; }
+}

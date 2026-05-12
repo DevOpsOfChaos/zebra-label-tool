@@ -1,5 +1,6 @@
 export type Language = 'de' | 'en';
 export type Theme = 'light' | 'dark';
+export type Density = 'comfortable' | 'compact';
 export type WorkflowMode = 'text' | 'text_code' | 'code' | 'sequence' | 'sequence_code' | 'batch';
 export type BarcodeType = 'code128' | 'code39' | 'ean13' | 'upca' | 'qrcode' | 'datamatrix' | 'pdf417';
 export type CodePosition = 'below' | 'above' | 'right' | 'left' | 'center';
@@ -25,7 +26,10 @@ export interface SequenceState {
 export interface AppState {
   language: Language;
   theme: Theme;
+  density: Density;
   sidebarCollapsed: boolean;
+  showZplPanel: boolean;
+  previewZoom: number;
   mode: WorkflowMode;
   printer: string;
   printers: string[];

@@ -264,3 +264,8 @@ npm run tauri dev
 ```
 
 The Tauri client supports text labels, text + code labels, code-only labels, numeric sequences, letter sequences, mixed letter/number sequences, sequence-specific QR/barcode payload templates, centered QR/code placement, and batch ZPL export.
+
+
+## UI workflow polish
+
+The Tauri client now uses progressive disclosure: common workflows are available as quick profile buttons, advanced text/code tools live inside collapsible sections, ZPL is hidden by default until requested, and preview zoom controls help fit labels into smaller windows.

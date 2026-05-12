@@ -93,3 +93,8 @@ The desktop client is no longer designed around a full-screen-only layout. It ha
 ## Sequence workflows
 
 The Tauri client supports numeric, letter-based, and mixed letter/number sequences. Sequence barcode/QR content can use generated values, the first printed line, all printed text, or a custom payload template such as `asset:{value}`, `rack-{letter}-{number:000}`, or `asset:{value}-{index}`.
+
+
+## UI workflow polish
+
+The Tauri client now uses progressive disclosure: common workflows are available as quick profile buttons, advanced text/code tools live inside collapsible sections, ZPL is hidden by default until requested, and preview zoom controls help fit labels into smaller windows.

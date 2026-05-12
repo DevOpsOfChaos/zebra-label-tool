@@ -99,3 +99,23 @@ def test_tauri_frontend_supports_centered_codes_and_mixed_sequence_tokens() -> N
     assert "replaceSequenceTokens" in zpl_ts
     assert "{number:000}" in main_ts or "sequenceTokenHelp" in main_ts
     assert 'data-seq-preset="mixed"' in main_ts
+
+
+def test_tauri_frontend_progressive_disclosure_and_quick_profiles() -> None:
+    main_ts = (DESKTOP / "src" / "main.ts").read_text(encoding="utf-8")
+    css = (DESKTOP / "src" / "styles.css").read_text(encoding="utf-8")
+    domain = (DESKTOP / "src" / "domain.ts").read_text(encoding="utf-8")
+    i18n = (DESKTOP / "src" / "i18n.ts").read_text(encoding="utf-8")
+    assert "renderWorkflowShortcuts" in main_ts
+    assert "applyWorkflowProfile" in main_ts
+    assert 'data-profile="device_qr"' in main_ts
+    assert 'data-profile="cable_series"' in main_ts
+    assert "showZplPanel" in domain
+    assert "previewZoom" in domain
+    assert "Density = 'comfortable' | 'compact'" in domain
+    assert "toggleZplBtn" in main_ts
+    assert "zoomInBtn" in main_ts
+    assert "inline-advanced" in css
+    assert "quick-strip" in css
+    assert "zpl-collapsed" in css
+    assert "quickWorkflows" in i18n

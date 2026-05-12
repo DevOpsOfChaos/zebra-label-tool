@@ -9,6 +9,7 @@ import {
   sequenceKindOrder,
   type AppState,
   type BarcodeMode,
+  type Density,
   type BarcodeType,
   type CodePosition,
   type Language,
@@ -23,7 +24,10 @@ const storageKey = 'zebra-label-tool.tauri.state';
 const defaultState: AppState = {
   language: (navigator.language || '').toLowerCase().startsWith('de') ? 'de' : 'en',
   theme: 'light',
+  density: 'compact',
   sidebarCollapsed: false,
+  showZplPanel: false,
+  previewZoom: 1,
   mode: 'text_code',
   printer: '',
   printers: [],
@@ -133,6 +137,7 @@ function modeDescription(mode: WorkflowMode): string {
 
 function render(): void {
   document.body.classList.toggle('dark', state.theme === 'dark');
+  document.body.classList.toggle('compact', state.density === 'compact');
   const app = document.getElementById('app');
   if (!app) return;
   app.innerHTML = `
@@ -166,6 +171,7 @@ function render(): void {
             <button class="button primary" id="printBtn">${t(state.language, 'print')}</button>
           </div>
         </div>
+        ${renderWorkflowShortcuts()}
         ${renderTextPanel()}
         ${renderCodePanel()}
         ${renderSequencePanel()}
@@ -177,13 +183,19 @@ function render(): void {
             <h2>${t(state.language, 'preview')}</h2>
             <p>${summaryText()}</p>
           </div>
-          <button class="button ghost" id="refreshPreviewBtn">↻</button>
+          <div class="preview-tools">
+            <button class="button ghost" id="zoomOutBtn" title="${t(state.language, 'zoomOut')}">−</button>
+            <button class="button ghost" id="fitPreviewBtn" title="${t(state.language, 'fitPreview')}">Fit</button>
+            <button class="button ghost" id="zoomInBtn" title="${t(state.language, 'zoomIn')}">+</button>
+            <button class="button ghost" id="toggleZplBtn">${state.showZplPanel ? t(state.language, 'hideZpl') : t(state.language, 'showZpl')}</button>
+            <button class="button ghost" id="refreshPreviewBtn">↻</button>
+          </div>
         </div>
         <div class="preview-stage">
           ${renderPreviewLabel()}
         </div>
         <div class="status" id="statusBox">${t(state.language, 'ready')}</div>
-        <textarea class="zpl-box" id="zplBox" spellcheck="false">${escapeHtml(currentZpl())}</textarea>
+        ${state.showZplPanel ? `<textarea class="zpl-box" id="zplBox" spellcheck="false">${escapeHtml(currentZpl())}</textarea>` : `<div class="zpl-collapsed">${t(state.language, 'zplHiddenHint')}</div>`}
       </aside>
     </main>
   `;
@@ -197,6 +209,26 @@ function modeButton(mode: WorkflowMode): string {
       <strong>${modeLabel(state.language, mode)}</strong>
       <small>${modeDescription(mode)}</small>
     </button>
+  `;
+}
+
+
+function renderWorkflowShortcuts(): string {
+  return `
+    <section class="quick-strip" aria-label="${t(state.language, 'quickWorkflows')}">
+      <div>
+        <strong>${t(state.language, 'quickWorkflows')}</strong>
+        <span>${t(state.language, 'quickWorkflowsHelp')}</span>
+      </div>
+      <div class="quick-actions">
+        <button class="pill" data-profile="plain_text">${t(state.language, 'profilePlain')}</button>
+        <button class="pill" data-profile="device_qr">${t(state.language, 'profileDeviceQr')}</button>
+        <button class="pill" data-profile="asset_qr">${t(state.language, 'profileAsset')}</button>
+        <button class="pill" data-profile="center_qr">${t(state.language, 'profileCenterQr')}</button>
+        <button class="pill" data-profile="cable_series">${t(state.language, 'profileCableSeries')}</button>
+        <button class="pill" data-profile="batch_boxes">${t(state.language, 'profileBatchBoxes')}</button>
+      </div>
+    </section>
   `;
 }
 
@@ -244,6 +276,7 @@ function renderAppSettings(): string {
       <div class="grid-2" style="margin-top:12px">
         <div class="field"><label>${t(state.language, 'language')}</label><select id="language"><option value="de" ${state.language === 'de' ? 'selected' : ''}>Deutsch</option><option value="en" ${state.language === 'en' ? 'selected' : ''}>English</option></select></div>
         <div class="field"><label>${t(state.language, 'theme')}</label><select id="theme"><option value="light" ${state.theme === 'light' ? 'selected' : ''}>Light</option><option value="dark" ${state.theme === 'dark' ? 'selected' : ''}>Dark</option></select></div>
+        <div class="field"><label>${t(state.language, 'density')}</label><select id="density"><option value="compact" ${state.density === 'compact' ? 'selected' : ''}>${t(state.language, 'compact')}</option><option value="comfortable" ${state.density === 'comfortable' ? 'selected' : ''}>${t(state.language, 'comfortable')}</option></select></div>
       </div>
     </details>
   `;
@@ -260,18 +293,26 @@ function renderTextPanel(): string {
       </div>
       <textarea id="textInput" spellcheck="false">${escapeHtml(state.text)}</textarea>
       <div class="grid-3">
-        ${numberField('fontSize', 'Font', state.fontSize, 8, 160)}
-        ${numberField('lineGap', 'Line gap', state.lineGap, 0, 80)}
-        <div class="field"><label>Alignment</label><select id="alignment"><option value="left" ${state.alignment === 'left' ? 'selected' : ''}>${t(state.language, 'left')}</option><option value="center" ${state.alignment === 'center' ? 'selected' : ''}>${t(state.language, 'center')}</option><option value="right" ${state.alignment === 'right' ? 'selected' : ''}>${t(state.language, 'right')}</option></select></div>
+        ${numberField('fontSize', t(state.language, 'font'), state.fontSize, 8, 160)}
+        ${numberField('lineGap', t(state.language, 'lineGap'), state.lineGap, 0, 80)}
+        <div class="field"><label>${t(state.language, 'alignment')}</label><select id="alignment"><option value="left" ${state.alignment === 'left' ? 'selected' : ''}>${t(state.language, 'left')}</option><option value="center" ${state.alignment === 'center' ? 'selected' : ''}>${t(state.language, 'center')}</option><option value="right" ${state.alignment === 'right' ? 'selected' : ''}>${t(state.language, 'right')}</option></select></div>
       </div>
       <div class="checkbox-row">
-        <label><input id="autoFit" type="checkbox" ${state.autoFit ? 'checked' : ''}> Auto-fit</label>
+        <label><input id="autoFit" type="checkbox" ${state.autoFit ? 'checked' : ''}> ${t(state.language, 'autoFit')}</label>
         <button class="button danger" id="clearTextBtn">✕</button>
         <button class="button" id="cleanBtn">${t(state.language, 'clean')}</button>
         <button class="button" id="upperBtn">${t(state.language, 'uppercase')}</button>
         <button class="button" id="lowerBtn">${t(state.language, 'lower')}</button>
         <button class="button" id="titleBtn">${t(state.language, 'titleCase')}</button>
       </div>
+      <details class="inline-advanced">
+        <summary>${t(state.language, 'moreTextTools')}</summary>
+        <div class="pill-row">
+          <button class="button" id="trimBtn">${t(state.language, 'trimLines')}</button>
+          <button class="button" id="dedupeBtn">${t(state.language, 'dedupeLines')}</button>
+          <button class="button" id="sampleTextBtn">${t(state.language, 'sampleText')}</button>
+        </div>
+      </details>
     </section>
   `;
 }
@@ -298,7 +339,15 @@ function renderCodePanel(): string {
         <button class="pill ${state.codePosition === 'center' ? 'active' : ''}" data-code-center="1">${t(state.language, 'centerCode')}</button>
       </div>
       ${state.mode !== 'sequence_code' ? `<div class="field"><label>${t(state.language, 'codeContent')}</label><input class="input" id="codeContent" value="${escapeAttr(state.codeContent)}"></div>` : ''}
-      <div class="checkbox-row"><label><input id="showBarcodeText" type="checkbox" ${state.showBarcodeText ? 'checked' : ''}> ${t(state.language, 'humanText')}</label></div>
+      <details class="inline-advanced">
+        <summary>${t(state.language, 'advancedCode')}</summary>
+        <div class="checkbox-row"><label><input id="showBarcodeText" type="checkbox" ${state.showBarcodeText ? 'checked' : ''}> ${t(state.language, 'humanText')}</label></div>
+        <div class="pill-row">
+          <button class="button" id="codeFromFirstLineBtn">${t(state.language, 'useFirstLine')}</button>
+          <button class="button" id="codeFromAllTextBtn">${t(state.language, 'useAllText')}</button>
+          <button class="button" id="sampleQrBtn">${t(state.language, 'sampleQr')}</button>
+        </div>
+      </details>
     </section>
   `;
 }
@@ -322,6 +371,7 @@ function renderSequencePanel(): string {
       ${state.sequence.kind === 'mixed' ? `<div class="field"><label>${t(state.language, 'valuePattern')}</label><input class="input" id="seqValuePattern" value="${escapeAttr(state.sequence.valuePattern)}"><p class="help">${t(state.language, 'sequenceTokenHelp')}</p></div>` : ''}
       <div class="field"><label>${t(state.language, 'template')}</label><textarea id="seqTemplate">${escapeHtml(state.sequence.template)}</textarea><p class="help">${t(state.language, 'sequenceTokenHelp')}</p></div>
       ${state.mode === 'sequence_code' ? `<div class="grid-2 compact-grid"><div class="field"><label>${t(state.language, 'barcodeMode')}</label><select id="barcodeMode"><option value="value" ${state.sequence.barcodeMode === 'value' ? 'selected' : ''}>${t(state.language, 'value')}</option><option value="first_line" ${state.sequence.barcodeMode === 'first_line' ? 'selected' : ''}>${t(state.language, 'first_line')}</option><option value="all_text" ${state.sequence.barcodeMode === 'all_text' ? 'selected' : ''}>${t(state.language, 'all_text')}</option><option value="template" ${state.sequence.barcodeMode === 'template' ? 'selected' : ''}>${t(state.language, 'templateMode')}</option></select></div><div class="field"><label>${t(state.language, 'barcodeTemplate')}</label><input class="input" id="seqBarcodeTemplate" value="${escapeAttr(state.sequence.barcodeTemplate)}"><p class="help">${t(state.language, 'sequenceTokenHelp')}</p></div></div>` : ''}
+      <div class="sequence-preview"><strong>${t(state.language, 'nextValues')}</strong><span>${sequenceValues(state).slice(0, 5).map(escapeHtml).join(' · ')}</span></div>
       <div class="pill-row" aria-label="${t(state.language, 'sequencePresets')}">
         <button class="pill" data-seq-preset="001">001, 002, 003</button>
         <button class="pill" data-seq-preset="asset">AS-0001</button>
@@ -357,9 +407,10 @@ function selected(actual: number, expected: number): string {
 function renderPreviewLabel(): string {
   const spec = buildSpec(state);
   const layout = calculateLayout(spec);
-  const maxW = state.sidebarCollapsed ? 520 : 390;
-  const maxH = state.sidebarCollapsed ? 320 : 250;
-  const scale = Math.min(maxW / layout.pw, maxH / layout.ll, 1.45);
+  const maxW = state.sidebarCollapsed ? 650 : 470;
+  const maxH = state.sidebarCollapsed ? 390 : 300;
+  const baseScale = Math.min(maxW / layout.pw, maxH / layout.ll, 1.55);
+  const scale = Math.max(0.25, Math.min(2.2, baseScale * state.previewZoom));
   const w = Math.max(80, Math.round(layout.pw * scale));
   const h = Math.max(40, Math.round(layout.ll * scale));
   const textStyle = `left:${layout.textX * scale}px;top:${layout.textY * scale}px;width:${layout.textW * scale}px;font-size:${Math.max(9, layout.fs * scale)}px;position:absolute;`;
@@ -415,6 +466,7 @@ function bindEvents(): void {
   bindInput('printerSelect', () => setState({ printer: stringValue('printerSelect') }));
   bindInput('language', () => setState({ language: stringValue('language', 'de') as Language }));
   bindInput('theme', () => setState({ theme: stringValue('theme', 'light') as Theme }));
+  bindInput('density', () => setState({ density: stringValue('density', 'compact') as Density }));
   bindInput('widthMm', () => setState({ widthMm: clamp(numberValue('widthMm', state.widthMm), 1, 500) }));
   bindInput('heightMm', () => setState({ heightMm: clamp(numberValue('heightMm', state.heightMm), 1, 500) }));
   bindInput('dpi', () => setState({ dpi: numberValue('dpi', state.dpi) }));
@@ -449,6 +501,10 @@ function bindEvents(): void {
   click('toggleSidebarBtn', () => setState({ sidebarCollapsed: !state.sidebarCollapsed }));
   click('refreshPrintersBtn', () => void refreshPrinters());
   click('refreshPreviewBtn', () => render());
+  click('toggleZplBtn', () => setState({ showZplPanel: !state.showZplPanel }));
+  click('fitPreviewBtn', () => setState({ previewZoom: 1 }));
+  click('zoomOutBtn', () => setState({ previewZoom: clamp(state.previewZoom - 0.1, 0.6, 1.8) }));
+  click('zoomInBtn', () => setState({ previewZoom: clamp(state.previewZoom + 0.1, 0.6, 1.8) }));
   click('copyZplBtn', () => void copyZpl());
   click('exportZplBtn', () => exportZpl());
   click('printBtn', () => void sendPrint());
@@ -457,6 +513,15 @@ function bindEvents(): void {
   click('upperBtn', () => updateText((text) => text.toUpperCase()));
   click('lowerBtn', () => updateText((text) => text.toLowerCase()));
   click('titleBtn', () => updateText((text) => text.toLowerCase().replace(/\b\p{L}/gu, (char) => char.toUpperCase())));
+  click('trimBtn', () => updateText((text) => text.split(/\r?\n/).map((line) => line.trim()).join('\n')));
+  click('dedupeBtn', () => updateText((text) => Array.from(new Set(text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean))).join('\n')));
+  click('sampleTextBtn', () => setState({ text: state.language === 'de' ? 'Gerät\nESP32-Küche' : 'Device\nESP32-Kitchen' }));
+  click('codeFromFirstLineBtn', () => setState({ codeContent: cleanLines(state.text).find((line) => line.trim()) ?? state.codeContent }));
+  click('codeFromAllTextBtn', () => setState({ codeContent: cleanLines(state.text).filter((line) => line.trim()).join(' | ') }));
+  click('sampleQrBtn', () => setState({ codeType: 'qrcode', codeContent: 'https://example.local/device/1', codePosition: 'right', codeArea: 120, codeMagnification: 5 }));
+  document.querySelectorAll<HTMLButtonElement>('[data-profile]').forEach((button) => {
+    button.addEventListener('click', () => applyWorkflowProfile(button.dataset.profile ?? 'plain_text'));
+  });
   document.querySelectorAll<HTMLButtonElement>('[data-code-size]').forEach((button) => {
     button.addEventListener('click', () => applyCodeSize(button.dataset.codeSize ?? 'medium'));
   });
@@ -481,6 +546,23 @@ function click(id: string, handler: () => void): void {
 
 function updateText(fn: (text: string) => string): void {
   setState({ text: fn(state.text) });
+}
+
+
+function applyWorkflowProfile(profile: string): void {
+  if (profile === 'device_qr') {
+    setState({ mode: 'text_code', widthMm: 57, heightMm: 25, text: 'Device\nESP32-Kitchen', codeType: 'qrcode', codeContent: 'https://example.local/device/esp32-kitchen', codePosition: 'right', codeArea: 120, codeMagnification: 5, fontSize: 44, alignment: 'left' });
+  } else if (profile === 'asset_qr') {
+    setState({ mode: 'text_code', widthMm: 62, heightMm: 29, text: 'Asset AS-0001\nRack A', codeType: 'qrcode', codeContent: 'asset:AS-0001', codePosition: 'right', codeArea: 115, codeMagnification: 5, fontSize: 38, alignment: 'left', border: true });
+  } else if (profile === 'center_qr') {
+    setState({ mode: 'code', widthMm: 40, heightMm: 40, text: '', codeType: 'qrcode', codeContent: 'https://example.local', codePosition: 'center', codeArea: 210, codeMagnification: 7, border: false });
+  } else if (profile === 'cable_series') {
+    setState({ mode: 'sequence_code', widthMm: 57, heightMm: 19, codeType: 'code128', codePosition: 'below', codeArea: 55, codeMagnification: 3, fontSize: 30, sequence: { ...state.sequence, kind: 'mixed', count: 12, padding: 2, letterStart: 'A', start: 1, prefix: '', suffix: '', valuePattern: 'CB-{letter}-{number:00}', template: '{value}\nCable', barcodeMode: 'value', barcodeTemplate: '{value}' } });
+  } else if (profile === 'batch_boxes') {
+    setState({ mode: 'batch', widthMm: 57, heightMm: 19, batchText: 'Box A-01\nShelf A\n\nBox A-02\nShelf A\n\nBox B-01\nShelf B', border: true });
+  } else {
+    setState({ mode: 'text', widthMm: 57, heightMm: 19, text: 'Label text', codeContent: '', codePosition: 'below', fontSize: 54, alignment: 'center', border: false });
+  }
 }
 
 function applyCodeSize(size: string): void {
