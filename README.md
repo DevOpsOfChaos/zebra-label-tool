@@ -46,7 +46,7 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Optional inverted label output
 - Optional border
 - Optional linear barcodes: Code 128, Code 39, EAN-13, UPC-A with real local preview patterns
-- Optional 2D codes: QR Code, Data Matrix, PDF417. QR preview uses a real QR matrix; Data Matrix/PDF417 are printer-rendered from ZPL and shown with deterministic layout previews.
+- Optional 2D codes: QR Code, Data Matrix, PDF417. QR preview uses a real QR matrix when `qrcode` is installed and falls back to a deterministic preview in partially prepared dev environments; Data Matrix/PDF417 are printer-rendered from ZPL and shown with deterministic layout previews.
 - Barcode/QR setup through the top menu to keep the main window clean
 - Side-by-side label layouts: place barcode/QR/Data Matrix/PDF417 code areas above, below, left, or right of the text
 - Top menu workflow for Label, Text, Barcode/QR, ZPL, text cleanup, batch tools, and numbered label series
@@ -108,8 +108,26 @@ py -m venv .venv
 python -m pip install --upgrade pip
 pip install -e ".[dev]"
 pytest -q
+python -m zebra_label_tool.doctor
 python main.py
 ```
+
+## Environment check
+
+Use the built-in doctor command when a fresh environment behaves differently than expected:
+
+```powershell
+python -m zebra_label_tool.doctor
+```
+
+For the Tauri client, use:
+
+```powershell
+cd desktop
+npm run doctor
+```
+
+The doctor does not change your system. It reports missing Python GUI dependencies, exact QR-preview support, Windows print support, Node/npm/Cargo availability, and the required Tauri icon files.
 
 ## Usage
 
@@ -234,3 +252,15 @@ Small, focused pull requests are preferred. Good first contributions:
 ## License
 
 MIT. See [`LICENSE`](LICENSE).
+
+## Modern desktop client
+
+The repository also contains an experimental Tauri client in `desktop/`. It provides the newer mode-based workflow and responsive layout while reusing the existing Python printing bridge.
+
+```powershell
+cd desktop
+npm install
+npm run tauri dev
+```
+
+The Tauri client supports text labels, text + code labels, code-only labels, numeric sequences, letter sequences, sequence-specific QR/barcode payloads, and batch ZPL export.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed Python QR preview tests so a missing optional `qrcode` install no longer crashes the test suite; the preview now falls back to a deterministic QR-like matrix.
+- Added environment doctor commands for Python and Tauri prerequisite checks.
 - Added an experimental modern Tauri desktop client under `desktop/`.
 - Added workflow-mode UI for text, text+code, code-only, number sequences, number sequences with code, and batch labels.
 - Added frontend ZPL generation and real barcode/2D-code preview through `bwip-js`.
@@ -81,3 +83,11 @@
 
 - Fixed an accidental duplicate widget argument in the main action row.
 - The changelog content is now a real changelog instead of duplicating roadmap text.
+
+## Unreleased
+
+- Fixed the Tauri Windows build scaffold by adding the required application icon.
+- Added compact responsive breakpoints for the Tauri desktop client.
+- Removed the duplicate “code with caption” workflow from the Tauri mode model; use Text + Code for labels with text.
+- Added letter sequences for the Tauri sequence workflow.
+- Added configurable sequence code payload templates so QR/barcode content can change per generated label.

@@ -40,6 +40,7 @@ dev = [
 [project.scripts]
 zebra-label-tool = "zebra_label_tool.cli:main"
 zebra-label-tool-gui = "zebra_label_tool.app:run"
+zebra-label-tool-doctor = "zebra_label_tool.doctor:main"
 
 [project.urls]
 Homepage = "https://github.com/DevOpsOfChaos/zebra-label-tool"

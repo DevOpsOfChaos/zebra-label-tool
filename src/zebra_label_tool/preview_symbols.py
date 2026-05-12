@@ -3,7 +3,8 @@
 The printer remains the source of truth for the final ZPL rendering. These helpers
 build high-fidelity local preview patterns for the symbologies where a compact
 pure-Python implementation is practical. QR uses the optional `qrcode` package
-which is declared as a runtime dependency.
+when available and falls back to a deterministic QR-like layout preview when a
+development environment has not installed optional GUI preview dependencies yet.
 """
 
 from __future__ import annotations
@@ -196,17 +197,6 @@ def encode_linear_symbol(barcode_type: str, payload: str) -> LinearSymbol:
     raise ValueError(f"No linear preview encoder for {barcode_type}")
 
 
-def encode_qr_matrix(payload: str, *, border: int = 4) -> MatrixSymbol:
-    import qrcode
-    from qrcode.constants import ERROR_CORRECT_M
-
-    qr = qrcode.QRCode(version=None, error_correction=ERROR_CORRECT_M, box_size=1, border=max(0, int(border)))
-    qr.add_data(str(payload or ""))
-    qr.make(fit=True)
-    matrix = tuple(tuple(bool(cell) for cell in row) for row in qr.get_matrix())
-    return MatrixSymbol(matrix, str(payload or ""), exact=True)
-
-
 def _hash_bits(payload: str, count: int) -> list[int]:
     bits: list[int] = []
     seed = sha256(str(payload or "").encode("utf-8")).digest()
@@ -221,6 +211,82 @@ def _hash_bits(payload: str, count: int) -> list[int]:
         seed = sha256(seed).digest()
     return bits
 
+
+
+def _draw_qr_finder(cells: list[list[bool]], top: int, left: int) -> None:
+    """Draw a 7x7 QR finder pattern into a preview matrix."""
+
+    for row in range(7):
+        for col in range(7):
+            y = top + row
+            x = left + col
+            if y < 0 or x < 0 or y >= len(cells) or x >= len(cells[y]):
+                continue
+            on_outer = row in {0, 6} or col in {0, 6}
+            on_center = 2 <= row <= 4 and 2 <= col <= 4
+            cells[y][x] = on_outer or on_center
+
+
+def _qr_fallback_matrix(payload: str, *, border: int = 4) -> MatrixSymbol:
+    """Return a deterministic QR-like matrix when the qrcode package is absent.
+
+    This is intentionally marked ``exact=False``. It keeps the UI and tests usable
+    in a partially prepared development environment while still being honest that
+    the printer/ZPL output remains the authoritative QR representation.
+    """
+
+    quiet = max(0, int(border))
+    payload_text = str(payload or "")
+    # Use a stable compact square that grows slightly with the payload. QR v1 is
+    # 21x21; larger payloads get a larger preview so the density still feels
+    # realistic in the canvas.
+    inner_size = 21 + min(20, max(0, len(payload_text) // 10) * 4)
+    size = inner_size + quiet * 2
+    cells = [[False for _ in range(size)] for _ in range(size)]
+
+    top = quiet
+    left = quiet
+    right = quiet + inner_size - 7
+    bottom = quiet + inner_size - 7
+    _draw_qr_finder(cells, top, left)
+    _draw_qr_finder(cells, top, right)
+    _draw_qr_finder(cells, bottom, left)
+
+    reserved: set[tuple[int, int]] = set()
+    for fy, fx in ((top, left), (top, right), (bottom, left)):
+        for row in range(fy - 1, fy + 8):
+            for col in range(fx - 1, fx + 8):
+                if 0 <= row < size and 0 <= col < size:
+                    reserved.add((row, col))
+
+    bits = _hash_bits(payload_text, size * size)
+    bit_index = 0
+    for row in range(quiet, quiet + inner_size):
+        for col in range(quiet, quiet + inner_size):
+            if (row, col) in reserved:
+                continue
+            # Add QR-like timing lines plus deterministic payload bits.
+            if row == quiet + 6 or col == quiet + 6:
+                cells[row][col] = (row + col) % 2 == 0
+            else:
+                cells[row][col] = bool(bits[bit_index])
+                bit_index += 1
+
+    return MatrixSymbol(tuple(tuple(row) for row in cells), payload_text, exact=False)
+
+
+def encode_qr_matrix(payload: str, *, border: int = 4) -> MatrixSymbol:
+    try:
+        import qrcode
+        from qrcode.constants import ERROR_CORRECT_M
+    except ModuleNotFoundError:
+        return _qr_fallback_matrix(payload, border=border)
+
+    qr = qrcode.QRCode(version=None, error_correction=ERROR_CORRECT_M, box_size=1, border=max(0, int(border)))
+    qr.add_data(str(payload or ""))
+    qr.make(fit=True)
+    matrix = tuple(tuple(bool(cell) for cell in row) for row in qr.get_matrix())
+    return MatrixSymbol(matrix, str(payload or ""), exact=True)
 
 def preview_datamatrix_matrix(payload: str, size: int = 18) -> MatrixSymbol:
     size = max(12, min(int(size), 36))

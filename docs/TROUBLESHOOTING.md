@@ -59,7 +59,7 @@ This is intentional. The main editor is multi-line, so Enter creates another pri
 
 `Ctrl+C` and `Ctrl+Z` are left to normal text editing behavior. Generated ZPL can still be copied from **View > Show ZPL...**.
 
-## QR preview is missing or not rendered
+## QR preview is approximate or not exact
 
 Run the current dependencies again:
 
@@ -67,7 +67,13 @@ Run the current dependencies again:
 pip install -r requirements.txt
 ```
 
-The local QR preview uses the `qrcode` package. The generated ZPL can still be copied/exported, but the GUI preview needs that package installed.
+The Python preview uses the `qrcode` package for exact QR matrices. If that package is missing, the app now falls back to a deterministic QR-like preview instead of crashing. Generated ZPL is still valid because Zebra firmware renders the final QR code from the ZPL command.
+
+Run the environment doctor when dependency state is unclear:
+
+```powershell
+python -m zebra_label_tool.doctor
+```
 
 ## The program starts in the wrong language
 
@@ -80,3 +86,14 @@ Use the compact **Label layout** area in the main window. For side-by-side label
 ## Number sequence export fails
 
 Check the selected barcode/QR payload mode. EAN-13 and UPC-A require numeric values, so prefixed values such as `AS-0001` are not valid for those symbologies. Use Code 128 or QR Code for mixed letters/numbers.
+
+## Tauri prerequisites look unclear
+
+From the desktop client directory, run:
+
+```powershell
+cd desktop
+npm run doctor
+```
+
+This checks Node.js, npm, Cargo, `Cargo.toml`, and the required Windows icon before you spend time reading a long Tauri build error.

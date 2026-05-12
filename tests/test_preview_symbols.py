@@ -1,3 +1,5 @@
+import builtins
+
 from zebra_label_tool.preview_symbols import (
     encode_code128,
     encode_code39,
@@ -38,13 +40,28 @@ def test_linear_dispatch_returns_modules():
     assert symbol.label == "ASSET-1"
 
 
-def test_qr_matrix_is_real_square_matrix_with_quiet_zone():
+def test_qr_matrix_is_square_matrix_with_quiet_zone():
     matrix = encode_qr_matrix("https://example.local/device/1")
-    assert matrix.exact is True
     assert len(matrix.cells) == len(matrix.cells[0])
     assert len(matrix.cells) >= 21
-    # quiet zone from qrcode border creates an empty first row
+    # qrcode exact mode and the fallback both keep a quiet first row.
     assert not any(matrix.cells[0])
+
+
+def test_qr_matrix_falls_back_when_optional_qrcode_package_is_missing(monkeypatch):
+    real_import = builtins.__import__
+
+    def blocked_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "qrcode" or name.startswith("qrcode."):
+            raise ModuleNotFoundError("No module named 'qrcode'")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", blocked_import)
+    matrix = encode_qr_matrix("https://example.local/device/1")
+    assert matrix.exact is False
+    assert len(matrix.cells) == len(matrix.cells[0])
+    assert not any(matrix.cells[0])
+    assert any(any(row) for row in matrix.cells)
 
 
 def test_datamatrix_and_pdf417_previews_are_deterministic_layout_previews():

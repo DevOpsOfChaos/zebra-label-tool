@@ -31,6 +31,17 @@ The Tkinter app is useful and still acts as the stable baseline, but it is visua
 
 You need Node.js and Rust for Tauri development. On Windows, Tauri also needs Microsoft C++ Build Tools and WebView2.
 
+## Check prerequisites
+
+Before running the full Tauri dev command, check the local desktop toolchain:
+
+```powershell
+cd desktop
+npm run doctor
+```
+
+This catches the common failures first: missing Cargo, missing Node/npm, and missing icon files.
+
 ## Start in development mode
 
 From the repository root:
@@ -70,3 +81,15 @@ Future packaging work should decide whether to:
 4. or expose printing through a small local service.
 
 Do not silently remove the Python app until the Tauri client has been manually verified on Windows with a real printer.
+
+## Build note
+
+The Tauri scaffold includes `src-tauri/icons/icon.ico`, which is required for Windows resource generation. If the build reports a missing icon, make sure the `desktop/src-tauri/icons/` directory was copied into the repo.
+
+## Responsive layout
+
+The desktop client is no longer designed around a full-screen-only layout. It has compact breakpoints for medium and narrow windows, reduced default window size, and lower minimum window dimensions.
+
+## Sequence workflows
+
+The Tauri client supports numeric and letter-based sequences. Sequence barcode/QR content can use generated values, the first printed line, all printed text, or a custom payload template such as `asset:{value}` or `rack-{value}-{index}`.
