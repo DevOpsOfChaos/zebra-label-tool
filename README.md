@@ -34,7 +34,7 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Direct RAW printing to installed Windows printers
 - Common DPI presets: 203, 300, 600
 - Common label size shortcuts
-- Compact main-window label layout area for size, code position, and code-area size
+- Compact main-window label layout area for size, code position, code-area size, and common layout profiles
 - Built-in presets for device labels, asset tags, QR device links, Wi-Fi QR labels, part numbers, retail EAN labels, storage bins, and cable markers
 - Main-window text controls for font size, alignment, and auto-fit
 - Enter in the text editor adds another printed line instead of printing accidentally
@@ -51,7 +51,8 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Layout quality warnings for auto-fit, empty labels, long barcodes, and line limits
 - Built-in presets with fill-in dialogs when a preset contains a barcode/QR payload
 - Templates moved to the bottom of the main panel
-- Persistent UI language setting with English and German built in
+- High-contrast secondary/destructive button styling so controls do not disappear into the background
+- Persistent UI language setting with English and German built in, including first-start language selection
 - Safer input validation before print/copy/export
 - Clean shutdown behavior from GUI close, Escape, or terminal interrupt
 - CLI mode for generating ZPL without starting the GUI

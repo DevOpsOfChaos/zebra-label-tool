@@ -20,6 +20,9 @@ The project should stay small and technician-friendly. New features should reduc
 - Batch ZPL generation from pasted text blocks
 - Linear barcode and 2D-code support: Code 128, Code 39, EAN-13, UPC-A, QR Code, Data Matrix, PDF417
 - Cleaner light UI with barcode/label setup moved out of the main panel
+- Persistent English/German language selection
+- High-contrast secondary/destructive button styling
+- Main-window layout profiles for common text/code arrangements
 
 ## Near-term usability
 

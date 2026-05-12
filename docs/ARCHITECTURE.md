@@ -24,7 +24,7 @@ These helpers are intentionally GUI-free so they are easy to test and extend.
 
 ## UI boundary
 
-`app.py` and `preview.py` contain the CustomTkinter/Tkinter desktop UI. The main window stays focused on text entry, a few high-frequency text controls, printer selection, print action, templates/history, and live preview.
+`app.py` and `preview.py` contain the CustomTkinter/Tkinter desktop UI. The main window stays focused on text entry, a few high-frequency text controls, printer selection, print action, a compact layout profile area, templates, and live preview.
 
 Advanced or less frequent operations live behind top-level menus and small windows:
 
@@ -59,6 +59,10 @@ The desktop UI uses a small built-in translation registry in `i18n.py`. English 
 
 Adding more languages is intentionally lightweight: add the language key to `SUPPORTED_LANGUAGES`, add a translation dictionary in `TRANSLATIONS`, and use existing keys for menu/dialog/main-window labels. The hard part is not code structure; it is keeping translations complete and reviewed by a competent speaker.
 
+## Button and contrast policy
+
+Buttons must never reuse card, panel, or background colors. Secondary actions use shared button color tokens from `constants.py`; destructive actions use explicit danger styling. This keeps quick controls visible even in the lighter UI theme.
+
 ## Label/code area layout
 
-The layout core supports code areas `above`, `below`, `left`, and `right`. Left/right layouts reserve a side area for barcode/QR/Data Matrix/PDF417 and reduce the text block width accordingly. The existing code size setting is used as the reserved side-area size to keep the main UI compact.
+The layout core supports code areas `above`, `below`, `left`, and `right`. Left/right layouts reserve a side area for barcode/QR/Data Matrix/PDF417 and reduce the text block width accordingly. The existing code size setting is used as the reserved side-area size to keep the main UI compact. The main window also exposes common layout profiles, but they only set existing validated fields rather than introducing a second layout system.

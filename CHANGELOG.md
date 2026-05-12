@@ -4,6 +4,10 @@
 
 ### Added
 
+- Dedicated button color tokens so secondary buttons no longer blend into card/background colors.
+- Main-window layout profile dropdown for common text/code arrangements such as text-only, code right, code left, barcode below, and code above.
+- Additional German UI translations for menus, dialogs, help text, status messages, batch labels, templates, built-in preset names/fields, and ZPL tools.
+
 - Help menu entries for a quick guide and keyboard shortcut reference.
 - Barcode and 2D-code support for Code 128, Code 39, EAN-13, UPC-A, QR Code, Data Matrix, and PDF417.
 - Shared barcode metadata and payload validation in `barcodes.py`.
@@ -30,6 +34,10 @@
 
 ### Changed
 
+- All secondary and destructive buttons now use visible button styling instead of card/background colors.
+- Label setup quick-size buttons are now clearly visible.
+- German mode now reaches more of the practical UI flow instead of only the main menu surface.
+
 - The red clear button now resets label text, selected template state, and active barcode/QR payload instead of only clearing text.
 - Enter now stays inside the multi-line editor and creates another printed label line instead of printing.
 - Printing moved to `Ctrl+P` and the **Print label** button to avoid accidental output.
@@ -46,6 +54,9 @@
 - The text options dialog uses readable cancel/apply button styling.
 
 ### Fixed
+
+- Fixed low-contrast quick setting buttons in the label setup area.
+- Fixed remaining hardcoded English labels in common dialogs and status feedback.
 
 - Fixed an accidental duplicate widget argument in the main action row.
 - The changelog content is now a real changelog instead of duplicating roadmap text.
