@@ -24,3 +24,11 @@ def test_number_sequence_translations_exist_in_english_and_german():
     assert translate("de", "action.number_sequence") == "Zahlenreihe..."
     assert translate("en", "sequence.barcode_mode.value") == "Generated number"
     assert translate("de", "sequence.barcode_mode.value") == "Erzeugte Nummer"
+
+
+def test_mode_translations_exist_in_english_and_german():
+    assert translate("en", "mode.text") == "Text"
+    assert translate("de", "mode.text") == "Nur Text"
+    assert translate("en", "mode.sequence_code") == "Number sequence + Code"
+    assert translate("de", "mode.sequence_code") == "Zahlenreihe + Code"
+    assert translate("de", "panel.printer_settings") == "Drucker"

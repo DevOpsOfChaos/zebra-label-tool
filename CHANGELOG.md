@@ -4,6 +4,11 @@
 
 ### Added
 
+- Main-window mode selector for Text, Text + Code, Code only + caption, Number sequence, Number sequence + Code, and Batch labels.
+- Mode-specific cards so the GUI only shows controls that are relevant for the selected workflow.
+- Inline number-sequence controls for start/count/step/padding/prefix/suffix, apply-first, copy-series-ZPL, and export-series-ZPL.
+- Collapsible printer and label setup sections using arrow buttons.
+
 - Number sequence tool for generated label runs with start/count/step, zero-padding, prefix/suffix, multi-line templates, quick variants, barcode/QR payload modes, first-label apply, clipboard copy, and `.zpl` export.
 - CLI number sequence options for generating serial/asset/cable label runs without opening the GUI.
 
@@ -36,6 +41,10 @@
 - Tests for side code-area layout and translation fallback.
 
 ### Changed
+
+- The main window is now workflow-driven instead of exposing all label/code controls at once.
+- Code controls are shown in code modes and hidden for pure text/sequence modes.
+- Print action prints the current label or the active number sequence depending on the selected mode; Batch mode opens the batch workflow instead of pretending to print a single label.
 
 - All secondary and destructive buttons now use visible button styling instead of card/background colors.
 - Label setup quick-size buttons are now clearly visible.

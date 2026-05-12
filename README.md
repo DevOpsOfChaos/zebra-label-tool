@@ -13,9 +13,10 @@ Zebra Label Tool focuses on a small workflow:
 1. choose label size and DPI,
 2. enter the label text as one or more rows,
 3. press Enter inside the editor when the label needs another printed line,
-4. tune advanced label/text/barcode options from the top menu,
-5. preview the result,
-6. print with the button or `Ctrl+P`, and open ZPL tools only when needed.
+4. pick a workflow mode such as Text, Text + Code, Code only, or Number sequence,
+5. tune advanced label/text/barcode options from the top menu only when needed,
+6. preview the result,
+7. print with the button or `Ctrl+P`, and open ZPL tools only when needed.
 
 ## Current status
 
@@ -25,6 +26,7 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 
 ## Features
 
+- Mode-based main GUI for Text, Text + Code, Code only + caption, Number sequence, Number sequence + Code, and Batch workflows
 - Multi-line label text editor
 - Live canvas preview using the same layout calculation as the ZPL generator
 - ZPL generation for Zebra-compatible printers
@@ -34,6 +36,7 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Direct RAW printing to installed Windows printers
 - Common DPI presets: 203, 300, 600
 - Common label size shortcuts
+- Collapsible printer and label setup sections to keep the main workflow clean
 - Compact main-window label layout area for size, code position, code-area size, and common layout profiles
 - Built-in presets for device labels, asset tags, QR device links, Wi-Fi QR labels, part numbers, retail EAN labels, storage bins, and cable markers
 - Main-window text controls for font size, alignment, and auto-fit
@@ -49,6 +52,7 @@ Windows RAW printing is supported through `pywin32`. On non-Windows systems the 
 - Text cleanup actions: trim whitespace, remove empty lines, uppercase, lowercase, title case, and wrap long lines
 - Batch label ZPL generation from pasted text blocks
 - Number sequence tool for serial labels, asset IDs, cable markers, storage bins, and other numbered runs
+- Inline number-sequence mode for fast serial labels without opening the full tool window
 - Layout quality warnings for auto-fit, empty labels, long barcodes, and line limits
 - Built-in presets with fill-in dialogs when a preset contains a barcode/QR payload
 - Templates moved to the bottom of the main panel

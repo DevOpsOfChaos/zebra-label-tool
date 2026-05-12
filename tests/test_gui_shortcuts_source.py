@@ -86,3 +86,22 @@ def test_number_sequence_tool_uses_visible_button_styles():
     assert "sequence.copy_zpl" in source
     assert "sequence.export" in source
     assert "COL_CARD" in source  # cards are allowed for frames, not buttons; contrast test covers buttons.
+
+
+def test_main_gui_has_workflow_modes_and_collapsible_setup_cards():
+    source = _source()
+    assert "LABEL_MODE_KEYS" in source
+    assert "self.mode_dd" in source
+    assert "def _apply_mode_to_ui" in source
+    assert "def _toggle_printer_panel" in source
+    assert "def _toggle_label_panel" in source
+    assert "self.code_card.grid_remove" in source
+    assert "self.sequence_card.grid_remove" in source
+
+
+def test_sequence_mode_can_generate_zpl_from_main_window():
+    source = _source()
+    assert "def _sequence_options_from_inline" in source
+    assert "def _preview_spec_for_current_mode" in source
+    assert "generate_number_sequence_zpl(spec, self._sequence_options_from_inline())" in source
+    assert "sequence_code" in source

@@ -52,6 +52,8 @@ ALIGNMENT_LABELS = ["center", "left", "right", "justify"]
 ROTATION_LABELS = ["normal", "90", "180", "270"]
 BARCODE_POSITION_KEYS = ["below", "above", "right", "left"]
 SEQUENCE_BARCODE_MODE_KEYS = ["none", "value", "first_line", "all_text"]
+LABEL_MODE_KEYS = ["text", "text_code", "code_only", "sequence", "sequence_code", "batch"]
+
 
 
 def _position_label(language: str | None, position: str) -> str:
@@ -94,6 +96,23 @@ def _layout_profile_key(language: str | None, value: str) -> str:
 
 
 
+def _mode_label(language: str | None, mode: str) -> str:
+    key = str(mode or "text").strip().lower()
+    return translate(language, f"mode.{key}")
+
+
+def _mode_key(language: str | None, value: str) -> str:
+    raw = str(value or "text").strip().lower()
+    for key in LABEL_MODE_KEYS:
+        if raw == key or raw == translate(language, f"mode.{key}").lower() or raw == translate("en", f"mode.{key}").lower() or raw == translate("de", f"mode.{key}").lower():
+            return key
+    return "text"
+
+
+def _mode_labels(language: str | None) -> list[str]:
+    return [_mode_label(language, key) for key in LABEL_MODE_KEYS]
+
+
 def _sequence_barcode_mode_label(language: str | None, mode: str) -> str:
     key = str(mode or "none").strip().lower()
     return translate(language, f"sequence.barcode_mode.{key}")
@@ -105,6 +124,23 @@ def _sequence_barcode_mode_key(language: str | None, value: str) -> str:
         if raw == key or raw == translate(language, f"sequence.barcode_mode.{key}").lower() or raw == translate("en", f"sequence.barcode_mode.{key}").lower() or raw == translate("de", f"sequence.barcode_mode.{key}").lower():
             return key
     return "none"
+
+
+def _mode_label(language: str | None, mode: str) -> str:
+    key = str(mode or "text").strip().lower()
+    return translate(language, f"mode.{key}")
+
+
+def _mode_key(language: str | None, value: str) -> str:
+    raw = str(value or "text").strip().lower()
+    for key in LABEL_MODE_KEYS:
+        if raw == key or raw == translate(language, f"mode.{key}").lower() or raw == translate("en", f"mode.{key}").lower() or raw == translate("de", f"mode.{key}").lower():
+            return key
+    return "text"
+
+
+def _mode_labels(language: str | None) -> list[str]:
+    return [_mode_label(language, key) for key in LABEL_MODE_KEYS]
 
 
 def _sequence_barcode_mode_labels(language: str | None) -> list[str]:
@@ -253,6 +289,17 @@ class ZebraApp(ctk.CTk):
         self.offset_y_var = tk.StringVar(value=str(self.settings.get("offset_y", 0)))
         self.auto_fit_var = tk.BooleanVar(value=bool(self.settings.get("auto_fit", True)))
         self.layout_profile_var = tk.StringVar(value=translate(self.lang, "layout_profile.custom"))
+        self.mode_var = tk.StringVar(value=_mode_label(self.lang, str(self.settings.get("mode", "text"))))
+        self.mode_help_var = tk.StringVar(value="")
+        self.show_printer_settings_var = tk.BooleanVar(value=bool(self.settings.get("show_printer_settings", True)))
+        self.show_label_settings_var = tk.BooleanVar(value=bool(self.settings.get("show_label_settings", True)))
+        self.sequence_start_var = tk.StringVar(value=str(self.settings.get("sequence_start", 1)))
+        self.sequence_count_var = tk.StringVar(value=str(self.settings.get("sequence_count", 10)))
+        self.sequence_step_var = tk.StringVar(value=str(self.settings.get("sequence_step", 1)))
+        self.sequence_padding_var = tk.StringVar(value=str(self.settings.get("sequence_padding", 3)))
+        self.sequence_prefix_var = tk.StringVar(value=str(self.settings.get("sequence_prefix", "")))
+        self.sequence_suffix_var = tk.StringVar(value=str(self.settings.get("sequence_suffix", "")))
+        self.sequence_barcode_mode_var = tk.StringVar(value=_sequence_barcode_mode_label(self.lang, str(self.settings.get("sequence_barcode_mode", "value"))))
 
     def _bind_shortcuts(self) -> None:
         self.bind("<Escape>", lambda e: self._safe_close())
@@ -369,101 +416,79 @@ class ZebraApp(ctk.CTk):
         self._build_right_panel()
 
     def _build_left_panel(self) -> None:
-        left = ctk.CTkFrame(self, width=420, fg_color=COL_PANEL)
+        left = ctk.CTkFrame(self, width=430, fg_color=COL_PANEL)
         left.grid(row=0, column=0, sticky="nsew", padx=(12, 6), pady=12)
         left.grid_columnconfigure(0, weight=1)
-        left.grid_rowconfigure(3, weight=1)
+        left.grid_rowconfigure(4, weight=1)
 
         header = ctk.CTkFrame(left, fg_color="transparent")
         header.grid(row=0, column=0, sticky="ew", padx=14, pady=(14, 8))
         header.grid_columnconfigure(0, weight=1)
         ctk.CTkLabel(header, text=APP_TITLE, font=ctk.CTkFont(size=21, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w")
-        ctk.CTkLabel(
-            header,
-            text=self._t("app.tagline"),
-            font=ctk.CTkFont(size=11),
-            text_color=COL_MUTED,
-        ).grid(row=1, column=0, sticky="w")
+        ctk.CTkLabel(header, text=self._t("app.tagline"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=1, column=0, sticky="w")
         self.status_lbl = ctk.CTkLabel(header, text="", font=ctk.CTkFont(size=11), text_color=COL_SUCCESS)
         self.status_lbl.grid(row=0, column=1, sticky="e")
 
-        printer = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
-        printer.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 8))
-        printer.grid_columnconfigure(0, weight=1)
-        self.printer_dd = ctk.CTkOptionMenu(
-            printer,
-            variable=self.printer_var,
-            values=get_printers(),
-            height=34,
-            command=lambda _: self._autosave(),
-        )
-        self.printer_dd.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
-        ctk.CTkButton(
-            printer,
-            text=self._t("action.refresh"),
-            width=86,
-            height=34,
-            command=self._refresh_printers,
-            **_secondary_button_style(),
-        ).grid(row=0, column=1, padx=(0, 10), pady=10)
+        mode_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
+        mode_card.grid(row=1, column=0, sticky="ew", padx=12, pady=(0, 8))
+        mode_card.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(mode_card, text=self._t("panel.mode"), font=ctk.CTkFont(size=13, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w", padx=(10, 8), pady=(9, 2))
+        self.mode_dd = ctk.CTkOptionMenu(mode_card, variable=self.mode_var, values=_mode_labels(self.lang), height=30, command=self._on_mode_change)
+        self.mode_dd.grid(row=0, column=1, sticky="ew", padx=(0, 10), pady=(9, 2))
+        self.mode_help_lbl = ctk.CTkLabel(mode_card, text="", justify="left", wraplength=380, font=ctk.CTkFont(size=10), text_color=COL_MUTED)
+        self.mode_help_lbl.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=(0, 9))
+
+        self.printer_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
+        self.printer_card.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 8))
+        self.printer_card.grid_columnconfigure(0, weight=1)
+        printer_header = ctk.CTkFrame(self.printer_card, fg_color="transparent")
+        printer_header.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 0))
+        printer_header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(printer_header, text=self._t("panel.printer_settings"), font=ctk.CTkFont(size=12, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w")
+        self.printer_toggle_btn = ctk.CTkButton(printer_header, text="", width=32, height=26, command=self._toggle_printer_panel, **_secondary_button_style())
+        self.printer_toggle_btn.grid(row=0, column=1, sticky="e")
+        self.printer_body = ctk.CTkFrame(self.printer_card, fg_color="transparent")
+        self.printer_body.grid(row=1, column=0, sticky="ew", padx=0, pady=(0, 8))
+        self.printer_body.grid_columnconfigure(0, weight=1)
+        self.printer_dd = ctk.CTkOptionMenu(self.printer_body, variable=self.printer_var, values=get_printers(), height=34, command=lambda _: self._autosave())
+        self.printer_dd.grid(row=0, column=0, sticky="ew", padx=10, pady=8)
+        ctk.CTkButton(self.printer_body, text=self._t("action.refresh"), width=86, height=34, command=self._refresh_printers, **_secondary_button_style()).grid(row=0, column=1, padx=(0, 10), pady=8)
 
         actions = ctk.CTkFrame(left, fg_color="transparent")
-        actions.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 8))
+        actions.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 8))
         actions.grid_columnconfigure(0, weight=2)
         actions.grid_columnconfigure(1, weight=1)
-        self.print_btn = ctk.CTkButton(
-            actions,
-            text=self._t("action.print_label"),
-            height=42,
-            font=ctk.CTkFont(size=14, weight="bold"),
-            fg_color=COL_ACCENT,
-            hover_color=COL_ACCENT_DARK,
-            command=self._on_print,
-        )
+        self.print_btn = ctk.CTkButton(actions, text=self._t("action.print_label"), height=42, font=ctk.CTkFont(size=14, weight="bold"), fg_color=COL_ACCENT, hover_color=COL_ACCENT_DARK, command=self._on_print)
         self.print_btn.grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        ctk.CTkButton(
-            actions,
-            text=self._t("action.new"),
-            height=42,
-            command=self._reset_label,
-            **_secondary_button_style(),
-        ).grid(row=0, column=1, sticky="ew")
+        ctk.CTkButton(actions, text=self._t("action.new"), height=42, command=self._reset_label, **_secondary_button_style()).grid(row=0, column=1, sticky="ew")
 
-        text_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
-        text_card.grid(row=3, column=0, sticky="nsew", padx=12, pady=(0, 8))
-        text_card.grid_columnconfigure(0, weight=1)
-        text_card.grid_rowconfigure(4, weight=1)
-
-        text_header = ctk.CTkFrame(text_card, fg_color="transparent")
+        self.text_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
+        self.text_card.grid(row=4, column=0, sticky="nsew", padx=12, pady=(0, 8))
+        self.text_card.grid_columnconfigure(0, weight=1)
+        self.text_card.grid_rowconfigure(4, weight=1)
+        text_header = ctk.CTkFrame(self.text_card, fg_color="transparent")
         text_header.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 4))
         text_header.grid_columnconfigure(1, weight=1)
-        self.clear_text_btn = ctk.CTkButton(
-            text_header,
-            text="✕",
-            width=32,
-            height=28,
-            corner_radius=8,
-            command=self._clear_label_content,
-            **_danger_button_style(),
-        )
-        self.clear_text_btn.grid(row=0, column=0, sticky="w", padx=(0, 8))
-        ctk.CTkLabel(text_header, text=self._t("panel.label_text"), font=ctk.CTkFont(size=14, weight="bold"), text_color=COL_TEXT).grid(row=0, column=1, sticky="w")
+        ctk.CTkButton(text_header, text="✕", width=32, height=28, corner_radius=8, command=self._clear_label_content, **_danger_button_style()).grid(row=0, column=0, sticky="w", padx=(0, 8))
+        self.text_title_lbl = ctk.CTkLabel(text_header, text=self._t("panel.label_text"), font=ctk.CTkFont(size=14, weight="bold"), text_color=COL_TEXT)
+        self.text_title_lbl.grid(row=0, column=1, sticky="w")
         self.text_counter_lbl = ctk.CTkLabel(text_header, text="", font=ctk.CTkFont(size=11), text_color=COL_MUTED)
         self.text_counter_lbl.grid(row=0, column=2, sticky="e")
 
-        text_controls = ctk.CTkFrame(text_card, fg_color=COL_CARD_ALT, corner_radius=10)
-        text_controls.grid(row=1, column=0, sticky="ew", padx=10, pady=(2, 8))
-        text_controls.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(text_controls, text=self._t("panel.font"), text_color=COL_MUTED, font=ctk.CTkFont(size=11)).grid(row=0, column=0, sticky="w", padx=(10, 6), pady=8)
-        self.font_slider = ctk.CTkSlider(text_controls, from_=8, to=160, number_of_steps=152, variable=self.font_size_var, command=self._on_inline_font_size)
+        self.text_controls = ctk.CTkFrame(self.text_card, fg_color=COL_CARD_ALT, corner_radius=10)
+        self.text_controls.grid(row=1, column=0, sticky="ew", padx=10, pady=(2, 8))
+        self.text_controls.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(self.text_controls, text=self._t("panel.font"), text_color=COL_MUTED, font=ctk.CTkFont(size=11)).grid(row=0, column=0, sticky="w", padx=(10, 6), pady=8)
+        self.font_slider = ctk.CTkSlider(self.text_controls, from_=8, to=160, number_of_steps=152, variable=self.font_size_var, command=self._on_inline_font_size)
         self.font_slider.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=8)
-        self.font_size_inline_lbl = ctk.CTkLabel(text_controls, text=str(self.font_size_var.get()), width=34, text_color=COL_TEXT)
+        self.font_size_inline_lbl = ctk.CTkLabel(self.text_controls, text=str(self.font_size_var.get()), width=34, text_color=COL_TEXT)
         self.font_size_inline_lbl.grid(row=0, column=2, padx=(0, 8), pady=8)
-        self.inline_alignment = ctk.CTkOptionMenu(text_controls, variable=self.alignment_var, values=ALIGNMENT_LABELS, width=105, height=28, command=lambda _: self._update_all())
+        self.inline_alignment = ctk.CTkOptionMenu(self.text_controls, variable=self.alignment_var, values=ALIGNMENT_LABELS, width=105, height=28, command=lambda _: self._update_all())
         self.inline_alignment.grid(row=0, column=3, padx=(0, 8), pady=8)
-        ctk.CTkCheckBox(text_controls, text=self._t("field.auto_fit"), variable=self.auto_fit_var, command=self._update_all).grid(row=0, column=4, padx=(0, 10), pady=8)
+        self.auto_fit_check = ctk.CTkCheckBox(self.text_controls, text=self._t("field.auto_fit"), variable=self.auto_fit_var, command=self._update_all)
+        self.auto_fit_check.grid(row=0, column=4, padx=(0, 10), pady=8)
 
-        quick_tools = ctk.CTkFrame(text_card, fg_color="transparent")
+        quick_tools = ctk.CTkFrame(self.text_card, fg_color="transparent")
         quick_tools.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 6))
         for col in range(4):
             quick_tools.grid_columnconfigure(col, weight=1)
@@ -472,62 +497,102 @@ class ZebraApp(ctk.CTk):
         ctk.CTkButton(quick_tools, text=self._t("panel.wrap"), height=28, font=ctk.CTkFont(size=11), command=self._wrap_text_dialog, **_secondary_button_style()).grid(row=0, column=2, sticky="ew", padx=(0, 6))
         ctk.CTkButton(quick_tools, text=self._t("panel.case"), height=28, font=ctk.CTkFont(size=11), command=lambda: self._format_text("uppercase"), **_secondary_button_style()).grid(row=0, column=3, sticky="ew")
 
-        ctk.CTkLabel(
-            text_card,
-            text=self._t("panel.text_hint", max_lines=MAX_TEXT_LINES),
-            font=ctk.CTkFont(size=10),
-            text_color=COL_MUTED,
-        ).grid(row=3, column=0, sticky="w", padx=10)
-        self.text_box = ctk.CTkTextbox(
-            text_card,
-            height=240,
-            font=ctk.CTkFont(size=20),
-            fg_color="#ffffff",
-            text_color=COL_TEXT,
-            border_width=1,
-            border_color=COL_BORDER,
-            wrap="none",
-            activate_scrollbars=True,
-        )
+        self.text_hint_lbl = ctk.CTkLabel(self.text_card, text=self._t("panel.text_hint", max_lines=MAX_TEXT_LINES), font=ctk.CTkFont(size=10), text_color=COL_MUTED)
+        self.text_hint_lbl.grid(row=3, column=0, sticky="w", padx=10)
+        self.text_box = ctk.CTkTextbox(self.text_card, height=210, font=ctk.CTkFont(size=20), fg_color="#ffffff", text_color=COL_TEXT, border_width=1, border_color=COL_BORDER, wrap="none", activate_scrollbars=True)
         self.text_box.grid(row=4, column=0, sticky="nsew", padx=10, pady=(6, 10))
         self.text_box.bind("<Return>", self._text_box_return)
         self.text_box.bind("<KeyRelease>", lambda _: self._update_all())
 
-        layout_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
-        layout_card.grid(row=4, column=0, sticky="ew", padx=12, pady=(0, 8))
-        layout_card.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(layout_card, text=self._t("panel.layout"), font=ctk.CTkFont(size=12, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, columnspan=4, sticky="w", padx=10, pady=(8, 2))
-        ctk.CTkLabel(layout_card, text=self._t("panel.size"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=1, column=0, sticky="w", padx=(10, 6), pady=(4, 8))
-        self.inline_size_var = tk.StringVar(value=self._size_label())
-        self.inline_size_dd = ctk.CTkOptionMenu(layout_card, variable=self.inline_size_var, values=["57 x 19 mm", "57 x 17 mm", "62 x 29 mm", "100 x 50 mm", translate(self.lang, "layout_profile.custom")], width=118, height=28, command=self._on_inline_size)
-        self.inline_size_dd.grid(row=1, column=1, sticky="ew", padx=(0, 8), pady=(4, 8))
-        ctk.CTkLabel(layout_card, text=self._t("panel.code_area"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=1, column=2, sticky="w", padx=(0, 6), pady=(4, 8))
-        self.inline_code_pos = ctk.CTkOptionMenu(layout_card, variable=self.barcode_pos_var, values=_position_labels(self.lang), width=132, height=28, command=lambda _: self._update_all())
-        self.inline_code_pos.grid(row=1, column=3, sticky="ew", padx=(0, 10), pady=(4, 8))
-        ctk.CTkLabel(layout_card, text=self._t("panel.code_size"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=2, column=0, sticky="w", padx=(10, 6), pady=(0, 10))
-        self.inline_code_size = ctk.CTkEntry(layout_card, textvariable=self.barcode_height_var, width=78, height=28)
-        self.inline_code_size.grid(row=2, column=1, sticky="w", padx=(0, 8), pady=(0, 10))
-        self.inline_code_size.bind("<KeyRelease>", lambda _: self._update_all())
-        ctk.CTkButton(layout_card, text=self._t("action.more"), height=28, command=self._open_label_setup, **_secondary_button_style()).grid(row=2, column=3, sticky="ew", padx=(0, 10), pady=(0, 10))
-        ctk.CTkLabel(layout_card, text=self._t("panel.layout_profile"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=3, column=0, sticky="w", padx=(10, 6), pady=(0, 10))
-        self.layout_profile_dd = ctk.CTkOptionMenu(
-            layout_card,
-            variable=self.layout_profile_var,
-            values=_layout_profile_labels(self.lang),
-            height=28,
-            command=self._apply_layout_profile,
-        )
-        self.layout_profile_dd.grid(row=3, column=1, columnspan=3, sticky="ew", padx=(0, 10), pady=(0, 10))
+        self.code_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
+        self.code_card.grid(row=5, column=0, sticky="ew", padx=12, pady=(0, 8))
+        self.code_card.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(self.code_card, text=self._t("panel.code_settings"), font=ctk.CTkFont(size=13, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, columnspan=4, sticky="w", padx=10, pady=(8, 2))
+        ctk.CTkLabel(self.code_card, text=self._t("field.payload"), text_color=COL_MUTED, font=ctk.CTkFont(size=11)).grid(row=1, column=0, sticky="w", padx=(10, 6), pady=(4, 6))
+        self.inline_code_payload = ctk.CTkEntry(self.code_card, textvariable=self.barcode_text_var, height=30)
+        self.inline_code_payload.grid(row=1, column=1, columnspan=3, sticky="ew", padx=(0, 10), pady=(4, 6))
+        self.inline_code_payload.bind("<KeyRelease>", lambda _: self._update_all())
+        ctk.CTkLabel(self.code_card, text=self._t("field.symbology"), text_color=COL_MUTED, font=ctk.CTkFont(size=11)).grid(row=2, column=0, sticky="w", padx=(10, 6), pady=(0, 8))
+        self.inline_code_type = ctk.CTkOptionMenu(self.code_card, variable=self.barcode_type_var, values=BARCODE_TYPE_LABELS, height=28, command=lambda _: self._update_all())
+        self.inline_code_type.grid(row=2, column=1, sticky="ew", padx=(0, 8), pady=(0, 8))
+        self.inline_code_pos = ctk.CTkOptionMenu(self.code_card, variable=self.barcode_pos_var, values=_position_labels(self.lang), height=28, command=lambda _: self._update_all())
+        self.inline_code_pos.grid(row=2, column=2, sticky="ew", padx=(0, 8), pady=(0, 8))
+        ctk.CTkButton(self.code_card, text=self._t("action.more"), height=28, command=self._open_barcode_options, **_secondary_button_style()).grid(row=2, column=3, sticky="ew", padx=(0, 10), pady=(0, 8))
+        helper = ctk.CTkFrame(self.code_card, fg_color="transparent")
+        helper.grid(row=3, column=1, columnspan=3, sticky="ew", padx=(0, 10), pady=(0, 8))
+        helper.grid_columnconfigure(0, weight=1)
+        helper.grid_columnconfigure(1, weight=1)
+        ctk.CTkButton(helper, text=self._t("field.use_first_line"), height=26, command=self._barcode_from_first_line, **_secondary_button_style()).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ctk.CTkButton(helper, text=self._t("field.use_all_text"), height=26, command=self._barcode_from_all_text, **_secondary_button_style()).grid(row=0, column=1, sticky="ew")
 
-        template_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
-        template_card.grid(row=5, column=0, sticky="ew", padx=12, pady=(0, 12))
-        template_card.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(template_card, text=self._t("panel.templates"), font=ctk.CTkFont(size=12, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, columnspan=3, sticky="w", padx=10, pady=(8, 2))
+        self.sequence_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
+        self.sequence_card.grid(row=6, column=0, sticky="ew", padx=12, pady=(0, 8))
+        self.sequence_card.grid_columnconfigure(1, weight=1)
+        self.sequence_card.grid_columnconfigure(3, weight=1)
+        ctk.CTkLabel(self.sequence_card, text=self._t("panel.sequence_setup"), font=ctk.CTkFont(size=13, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, columnspan=4, sticky="w", padx=10, pady=(8, 2))
+        self._inline_sequence_entry(self.sequence_card, 1, 0, self._t("sequence.start"), self.sequence_start_var)
+        self._inline_sequence_entry(self.sequence_card, 1, 2, self._t("sequence.count"), self.sequence_count_var)
+        self._inline_sequence_entry(self.sequence_card, 2, 0, self._t("sequence.step"), self.sequence_step_var)
+        self._inline_sequence_entry(self.sequence_card, 2, 2, self._t("sequence.padding"), self.sequence_padding_var)
+        self._inline_sequence_entry(self.sequence_card, 3, 0, self._t("sequence.prefix"), self.sequence_prefix_var)
+        self._inline_sequence_entry(self.sequence_card, 3, 2, self._t("sequence.suffix"), self.sequence_suffix_var)
+        ctk.CTkLabel(self.sequence_card, text=self._t("sequence.code_payload"), text_color=COL_MUTED, font=ctk.CTkFont(size=11)).grid(row=4, column=0, sticky="w", padx=(10, 6), pady=(0, 8))
+        self.sequence_mode_dd = ctk.CTkOptionMenu(self.sequence_card, variable=self.sequence_barcode_mode_var, values=_sequence_barcode_mode_labels(self.lang), height=28, command=lambda _: self._update_all())
+        self.sequence_mode_dd.grid(row=4, column=1, columnspan=2, sticky="ew", padx=(0, 8), pady=(0, 8))
+        ctk.CTkButton(self.sequence_card, text=self._t("sequence.open_full"), height=28, command=self._open_number_sequence_window, **_secondary_button_style()).grid(row=4, column=3, sticky="ew", padx=(0, 10), pady=(0, 8))
+        seq_actions = ctk.CTkFrame(self.sequence_card, fg_color="transparent")
+        seq_actions.grid(row=5, column=0, columnspan=4, sticky="ew", padx=10, pady=(0, 10))
+        seq_actions.grid_columnconfigure(0, weight=1)
+        seq_actions.grid_columnconfigure(1, weight=1)
+        seq_actions.grid_columnconfigure(2, weight=1)
+        ctk.CTkButton(seq_actions, text=self._t("sequence.apply_first"), height=28, command=self._apply_sequence_first_inline, **_secondary_button_style()).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ctk.CTkButton(seq_actions, text=self._t("sequence.copy_zpl"), height=28, command=self._copy_sequence_inline).grid(row=0, column=1, sticky="ew", padx=(0, 6))
+        ctk.CTkButton(seq_actions, text=self._t("sequence.export"), height=28, command=self._export_sequence_inline, **_secondary_button_style()).grid(row=0, column=2, sticky="ew")
+
+        self.layout_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
+        self.layout_card.grid(row=7, column=0, sticky="ew", padx=12, pady=(0, 8))
+        self.layout_card.grid_columnconfigure(1, weight=1)
+        layout_header = ctk.CTkFrame(self.layout_card, fg_color="transparent")
+        layout_header.grid(row=0, column=0, columnspan=4, sticky="ew", padx=10, pady=(8, 2))
+        layout_header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(layout_header, text=self._t("panel.layout"), font=ctk.CTkFont(size=12, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, sticky="w")
+        self.layout_toggle_btn = ctk.CTkButton(layout_header, text="", width=32, height=26, command=self._toggle_label_panel, **_secondary_button_style())
+        self.layout_toggle_btn.grid(row=0, column=1, sticky="e")
+        self.layout_body = ctk.CTkFrame(self.layout_card, fg_color="transparent")
+        self.layout_body.grid(row=1, column=0, columnspan=4, sticky="ew")
+        self.layout_body.grid_columnconfigure(1, weight=1)
+        self.layout_body.grid_columnconfigure(3, weight=1)
+        ctk.CTkLabel(self.layout_body, text=self._t("panel.size"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=0, column=0, sticky="w", padx=(10, 6), pady=(4, 8))
+        self.inline_size_var = tk.StringVar(value=self._size_label())
+        self.inline_size_dd = ctk.CTkOptionMenu(self.layout_body, variable=self.inline_size_var, values=["57 x 19 mm", "57 x 17 mm", "62 x 29 mm", "100 x 50 mm", translate(self.lang, "layout_profile.custom")], height=28, command=self._on_inline_size)
+        self.inline_size_dd.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=(4, 8))
+        ctk.CTkLabel(self.layout_body, text=self._t("panel.code_size"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=0, column=2, sticky="w", padx=(0, 6), pady=(4, 8))
+        self.inline_code_size = ctk.CTkEntry(self.layout_body, textvariable=self.barcode_height_var, width=78, height=28)
+        self.inline_code_size.grid(row=0, column=3, sticky="ew", padx=(0, 10), pady=(4, 8))
+        self.inline_code_size.bind("<KeyRelease>", lambda _: self._update_all())
+        ctk.CTkLabel(self.layout_body, text=self._t("panel.layout_profile"), font=ctk.CTkFont(size=11), text_color=COL_MUTED).grid(row=1, column=0, sticky="w", padx=(10, 6), pady=(0, 10))
+        self.layout_profile_dd = ctk.CTkOptionMenu(self.layout_body, variable=self.layout_profile_var, values=_layout_profile_labels(self.lang), height=28, command=self._apply_layout_profile)
+        self.layout_profile_dd.grid(row=1, column=1, columnspan=2, sticky="ew", padx=(0, 8), pady=(0, 10))
+        ctk.CTkButton(self.layout_body, text=self._t("action.more"), height=28, command=self._open_label_setup, **_secondary_button_style()).grid(row=1, column=3, sticky="ew", padx=(0, 10), pady=(0, 10))
+
+        self.template_card = ctk.CTkFrame(left, fg_color=COL_CARD, corner_radius=12, border_width=1, border_color=COL_BORDER)
+        self.template_card.grid(row=8, column=0, sticky="ew", padx=12, pady=(0, 12))
+        self.template_card.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(self.template_card, text=self._t("panel.templates"), font=ctk.CTkFont(size=12, weight="bold"), text_color=COL_TEXT).grid(row=0, column=0, columnspan=3, sticky="w", padx=10, pady=(8, 2))
         self.template_var = tk.StringVar(value=self._t("template.choose"))
-        self.template_dd = ctk.CTkOptionMenu(template_card, variable=self.template_var, values=self._template_names(), height=30, command=self._load_template)
+        self.template_dd = ctk.CTkOptionMenu(self.template_card, variable=self.template_var, values=self._template_names(), height=30, command=self._load_template)
         self.template_dd.grid(row=1, column=0, sticky="ew", padx=(10, 6), pady=(2, 10))
-        ctk.CTkButton(template_card, text=self._t("action.save"), width=78, height=30, command=self._save_template, **_secondary_button_style()).grid(row=1, column=1, padx=(0, 6), pady=(2, 10))
-        ctk.CTkButton(template_card, text=self._t("action.delete"), width=72, height=30, command=self._delete_template, **_danger_button_style()).grid(row=1, column=2, padx=(0, 10), pady=(2, 10))
+        ctk.CTkButton(self.template_card, text=self._t("action.save"), width=78, height=30, command=self._save_template, **_secondary_button_style()).grid(row=1, column=1, padx=(0, 6), pady=(2, 10))
+        ctk.CTkButton(self.template_card, text=self._t("action.delete"), width=72, height=30, command=self._delete_template, **_danger_button_style()).grid(row=1, column=2, padx=(0, 10), pady=(2, 10))
+
+        self._sync_collapsible_cards()
+        self._apply_mode_to_ui()
+
+    def _inline_sequence_entry(self, parent, row: int, col: int, label: str, variable: tk.StringVar) -> None:
+        ctk.CTkLabel(parent, text=label, text_color=COL_MUTED, font=ctk.CTkFont(size=11)).grid(row=row, column=col, sticky="w", padx=(10 if col == 0 else 0, 6), pady=(4, 6))
+        entry = ctk.CTkEntry(parent, textvariable=variable, height=28, width=86)
+        entry.grid(row=row, column=col + 1, sticky="ew", padx=(0, 10 if col == 2 else 8), pady=(4, 6))
+        entry.bind("<KeyRelease>", lambda _: self._update_all())
 
     def _build_right_panel(self) -> None:
         right = ctk.CTkFrame(self, fg_color=COL_PANEL)
@@ -569,6 +634,152 @@ class ZebraApp(ctk.CTk):
         )
         self.preview_hint.grid(row=0, column=0, sticky="w")
 
+
+    def _current_mode(self) -> str:
+        return _mode_key(self.lang, self.mode_var.get())
+
+    def _on_mode_change(self, value: str | None = None) -> None:
+        key = _mode_key(self.lang, value or self.mode_var.get())
+        self.mode_var.set(_mode_label(self.lang, key))
+        self.settings["mode"] = key
+        save_settings(self.settings)
+        if key == "text":
+            self.barcode_var.set(False)
+        elif key in {"text_code", "code_only", "sequence_code"}:
+            self.barcode_var.set(True)
+            if not self.barcode_text_var.get().strip() and key != "sequence_code":
+                payload = " | ".join(line for line in self._get_text_lines() if line.strip())
+                self.barcode_text_var.set(payload or "CODE")
+        elif key == "sequence":
+            self.barcode_var.set(False)
+        elif key == "batch":
+            self.barcode_var.set(False)
+        self._apply_mode_to_ui()
+        self._update_all()
+
+    def _apply_mode_to_ui(self) -> None:
+        if not hasattr(self, "text_card"):
+            return
+        key = self._current_mode()
+        desc = self._t(f"mode.{key}.help")
+        if hasattr(self, "mode_help_lbl"):
+            self.mode_help_lbl.configure(text=desc)
+        if hasattr(self, "mode_dd"):
+            self.mode_dd.configure(values=_mode_labels(self.lang))
+        self.mode_var.set(_mode_label(self.lang, key))
+
+        show_code = key in {"text_code", "code_only", "sequence_code"}
+        show_sequence = key in {"sequence", "sequence_code"}
+        show_text = key in {"text", "text_code", "code_only", "sequence", "sequence_code", "batch"}
+
+        (self.text_card.grid if show_text else self.text_card.grid_remove)()
+        (self.code_card.grid if show_code else self.code_card.grid_remove)()
+        (self.sequence_card.grid if show_sequence else self.sequence_card.grid_remove)()
+
+        if key == "code_only":
+            self.text_title_lbl.configure(text=self._t("panel.caption_text"))
+            self.text_hint_lbl.configure(text=self._t("panel.caption_hint"))
+        elif key in {"sequence", "sequence_code"}:
+            self.text_title_lbl.configure(text=self._t("panel.sequence_template"))
+            self.text_hint_lbl.configure(text=self._t("panel.sequence_template_hint"))
+        elif key == "batch":
+            self.text_title_lbl.configure(text=self._t("panel.batch_text"))
+            self.text_hint_lbl.configure(text=self._t("panel.batch_inline_hint"))
+        else:
+            self.text_title_lbl.configure(text=self._t("panel.label_text"))
+            self.text_hint_lbl.configure(text=self._t("panel.text_hint", max_lines=MAX_TEXT_LINES))
+
+        if key in {"sequence", "sequence_code"}:
+            self.print_btn.configure(text=self._t("action.print_series"))
+        elif key == "batch":
+            self.print_btn.configure(text=self._t("action.open_batch"))
+        else:
+            self.print_btn.configure(text=self._t("action.print_label"))
+
+    def _toggle_printer_panel(self) -> None:
+        self.show_printer_settings_var.set(not self.show_printer_settings_var.get())
+        self.settings["show_printer_settings"] = self.show_printer_settings_var.get()
+        save_settings(self.settings)
+        self._sync_collapsible_cards()
+
+    def _toggle_label_panel(self) -> None:
+        self.show_label_settings_var.set(not self.show_label_settings_var.get())
+        self.settings["show_label_settings"] = self.show_label_settings_var.get()
+        save_settings(self.settings)
+        self._sync_collapsible_cards()
+
+    def _sync_collapsible_cards(self) -> None:
+        if hasattr(self, "printer_body"):
+            if self.show_printer_settings_var.get():
+                self.printer_body.grid()
+                self.printer_toggle_btn.configure(text="▾")
+            else:
+                self.printer_body.grid_remove()
+                self.printer_toggle_btn.configure(text="▸")
+        if hasattr(self, "layout_body"):
+            if self.show_label_settings_var.get():
+                self.layout_body.grid()
+                self.layout_toggle_btn.configure(text="▾")
+            else:
+                self.layout_body.grid_remove()
+                self.layout_toggle_btn.configure(text="▸")
+
+    def _sequence_options_from_inline(self):
+        return normalize_number_sequence_options(
+            start=self.sequence_start_var.get(),
+            count=self.sequence_count_var.get(),
+            step=self.sequence_step_var.get(),
+            padding=self.sequence_padding_var.get(),
+            prefix=self.sequence_prefix_var.get(),
+            suffix=self.sequence_suffix_var.get(),
+            line_template=self.text_box.get("1.0", "end-1c") if hasattr(self, "text_box") else "{value}",
+            enable_barcode=self._current_mode() == "sequence_code",
+            barcode_mode=_sequence_barcode_mode_key(self.lang, self.sequence_barcode_mode_var.get()) if self._current_mode() == "sequence_code" else "none",
+        )
+
+    def _preview_spec_for_current_mode(self, base: LabelSpec) -> LabelSpec:
+        if self._current_mode() in {"sequence", "sequence_code"}:
+            specs = build_number_sequence_specs(base, self._sequence_options_from_inline())
+            return specs[0]
+        return base
+
+    def _copy_sequence_inline(self) -> None:
+        try:
+            zpl = generate_number_sequence_zpl(self._read_spec(), self._sequence_options_from_inline())
+        except (NumberSequenceError, LabelSpecError, ValueError) as exc:
+            self._status(self._t("message.invalid_input", error=""), COL_ERR)
+            messagebox.showwarning(self._t("dialog.number_sequence"), str(exc), parent=self)
+            return
+        self.clipboard_clear()
+        self.clipboard_append(zpl)
+        self._status(self._t("status.sequence_copied"), COL_SUCCESS)
+
+    def _export_sequence_inline(self) -> None:
+        try:
+            zpl = generate_number_sequence_zpl(self._read_spec(), self._sequence_options_from_inline())
+        except (NumberSequenceError, LabelSpecError, ValueError) as exc:
+            messagebox.showwarning(self._t("dialog.number_sequence"), str(exc), parent=self)
+            return
+        path = filedialog.asksaveasfilename(parent=self, title=self._t("sequence.export"), defaultextension=".zpl", filetypes=[("ZPL files", "*.zpl"), ("Text files", "*.txt"), ("All files", "*.*")])
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8", newline="\n") as file:
+                file.write(zpl)
+                file.write("\n")
+        except OSError as exc:
+            messagebox.showerror(self._t("message.export_failed"), str(exc), parent=self)
+            return
+        self._status(self._t("status.sequence_exported"), COL_SUCCESS)
+
+    def _apply_sequence_first_inline(self) -> None:
+        try:
+            first = build_number_sequence_specs(self._read_spec(), self._sequence_options_from_inline())[0]
+        except (NumberSequenceError, LabelSpecError, ValueError, IndexError) as exc:
+            messagebox.showwarning(self._t("dialog.number_sequence"), str(exc), parent=self)
+            return
+        self._apply_setting_values(self._spec_to_settings(first))
+        self._status(self._t("status.sequence_first_applied"), COL_SUCCESS)
 
     def _apply_layout_profile(self, value: str) -> None:
         key = _layout_profile_key(self.lang, value)
@@ -669,6 +880,14 @@ class ZebraApp(ctk.CTk):
         self.offset_x_var.set(str(s.get("offset_x", 0)))
         self.offset_y_var.set(str(s.get("offset_y", 0)))
         self.auto_fit_var.set(bool(s.get("auto_fit", True)))
+        self.mode_var.set(_mode_label(self.lang, str(s.get("mode", self._current_mode()))))
+        self.sequence_start_var.set(str(s.get("sequence_start", self.sequence_start_var.get())))
+        self.sequence_count_var.set(str(s.get("sequence_count", self.sequence_count_var.get())))
+        self.sequence_step_var.set(str(s.get("sequence_step", self.sequence_step_var.get())))
+        self.sequence_padding_var.set(str(s.get("sequence_padding", self.sequence_padding_var.get())))
+        self.sequence_prefix_var.set(str(s.get("sequence_prefix", self.sequence_prefix_var.get())))
+        self.sequence_suffix_var.set(str(s.get("sequence_suffix", self.sequence_suffix_var.get())))
+        self.sequence_barcode_mode_var.set(_sequence_barcode_mode_label(self.lang, str(s.get("sequence_barcode_mode", "value"))))
         if hasattr(self, "font_size_inline_lbl"):
             self.font_size_inline_lbl.configure(text=str(self.font_size_var.get()))
         if hasattr(self, "inline_size_var"):
@@ -684,6 +903,8 @@ class ZebraApp(ctk.CTk):
             lines = [s.get("line1", ""), s.get("line2", "")]
         self._set_text_lines([str(line) for line in lines])
         self._refresh_template_dropdown()
+        self._sync_collapsible_cards()
+        self._apply_mode_to_ui()
 
     def _read_spec(self) -> LabelSpec:
         return LabelSpec.from_raw(
@@ -719,7 +940,7 @@ class ZebraApp(ctk.CTk):
         except LabelSpecError as exc:
             self.print_btn.configure(state="disabled")
             self.preview_info.configure(text=self._t("message.input_error", error=exc))
-            self.text_counter_lbl.configure(text="invalid")
+            self.text_counter_lbl.configure(text=self._t("message.invalid_short"))
             self.setup_summary_lbl.configure(text=self._t("message.invalid_input", error=exc))
             if hasattr(self, "quality_lbl"):
                 self.quality_lbl.configure(text=self._t("message.fix_input"), text_color=COL_ERR)
@@ -727,46 +948,59 @@ class ZebraApp(ctk.CTk):
             return
 
         self.print_btn.configure(state="normal")
-        line_count = len([line for line in spec.text_lines if line.strip()]) or 1
-        self.text_counter_lbl.configure(text=f"{line_count} line{'s' if line_count != 1 else ''}")
-        dots_w = mm_to_dots(spec.width_mm, spec.dpi)
-        dots_h = mm_to_dots(spec.height_mm, spec.dpi)
-        self.preview_info.configure(text=f"{dots_w} x {dots_h} dots  @{spec.dpi} dpi")
+        try:
+            preview_spec = self._preview_spec_for_current_mode(spec)
+        except (NumberSequenceError, LabelSpecError, ValueError) as exc:
+            self.print_btn.configure(state="disabled")
+            self.preview_info.configure(text=self._t("message.input_error", error=exc))
+            self.setup_summary_lbl.configure(text=self._t("message.invalid_input", error=exc))
+            self.quality_lbl.configure(text=self._t("message.fix_input"), text_color=COL_ERR)
+            self._refresh_zpl_window(f"-- Invalid input --\n{exc}\n", error=True)
+            return
+        line_count = len([line for line in preview_spec.text_lines if line.strip()]) or 1
+        self.text_counter_lbl.configure(text=self._t("message.line_count", count=line_count, suffix="" if line_count == 1 else ("n" if self.lang == "de" else "s")))
+        dots_w = mm_to_dots(preview_spec.width_mm, preview_spec.dpi)
+        dots_h = mm_to_dots(preview_spec.height_mm, preview_spec.dpi)
+        self.preview_info.configure(text=f"{dots_w} x {dots_h} dots  @{preview_spec.dpi} dpi")
         self.setup_summary_lbl.configure(
             text=(
-                f"{_short_number(spec.width_mm)} x {_short_number(spec.height_mm)} mm, {spec.dpi} dpi, {spec.copies} copies\n"
-                f"Font {spec.font_style}, size {spec.font_size}, {spec.alignment}, rotation {spec.rotation}, gap {spec.line_gap}\n"
-                f"Border {'on' if spec.border else 'off'}, inverted {'on' if spec.inverted else 'off'}, "
-                f"code {BARCODE_TYPES[spec.barcode_type].label if spec.active_barcode else 'off'}"
+                f"{self._t('panel.mode')}: {_mode_label(self.lang, self._current_mode())}\n"
+                f"{_short_number(preview_spec.width_mm)} x {_short_number(preview_spec.height_mm)} mm, {preview_spec.dpi} dpi, {preview_spec.copies} copies\n"
+                f"Font {preview_spec.font_style}, size {preview_spec.font_size}, {preview_spec.alignment}, rotation {preview_spec.rotation}, gap {preview_spec.line_gap}\n"
+                f"Border {'on' if preview_spec.border else 'off'}, inverted {'on' if preview_spec.inverted else 'off'}, "
+                f"code {BARCODE_TYPES[preview_spec.barcode_type].label if preview_spec.active_barcode else 'off'}"
             )
         )
-        self._update_quality_warning(spec)
+        self._update_quality_warning(preview_spec)
         self.preview_canvas.update_preview(
-            lines=spec.text_lines,
-            width_mm=spec.width_mm,
-            height_mm=spec.height_mm,
-            font_size=spec.font_size,
-            dpi=spec.dpi,
-            inverted=spec.inverted,
-            border=spec.border,
-            barcode=spec.barcode,
-            barcode_text=spec.barcode_text,
-            barcode_pos=spec.barcode_pos,
-            barcode_type=spec.barcode_type,
-            barcode_height=spec.barcode_height,
-            barcode_show_text=spec.barcode_show_text,
-            barcode_magnification=spec.barcode_magnification,
-            alignment=spec.alignment,
-            rotation=spec.rotation,
-            line_gap=spec.line_gap,
-            offset_x=spec.offset_x,
-            offset_y=spec.offset_y,
-            auto_fit=spec.auto_fit,
+            lines=preview_spec.text_lines,
+            width_mm=preview_spec.width_mm,
+            height_mm=preview_spec.height_mm,
+            font_size=preview_spec.font_size,
+            dpi=preview_spec.dpi,
+            inverted=preview_spec.inverted,
+            border=preview_spec.border,
+            barcode=preview_spec.barcode,
+            barcode_text=preview_spec.barcode_text,
+            barcode_pos=preview_spec.barcode_pos,
+            barcode_type=preview_spec.barcode_type,
+            barcode_height=preview_spec.barcode_height,
+            barcode_show_text=preview_spec.barcode_show_text,
+            barcode_magnification=preview_spec.barcode_magnification,
+            alignment=preview_spec.alignment,
+            rotation=preview_spec.rotation,
+            line_gap=preview_spec.line_gap,
+            offset_x=preview_spec.offset_x,
+            offset_y=preview_spec.offset_y,
+            auto_fit=preview_spec.auto_fit,
         )
-        self._refresh_zpl_window(spec.to_zpl())
+        self._refresh_zpl_window(self._build_zpl())
 
     def _build_zpl(self) -> str:
-        return self._read_spec().to_zpl()
+        spec = self._read_spec()
+        if self._current_mode() in {"sequence", "sequence_code"}:
+            return generate_number_sequence_zpl(spec, self._sequence_options_from_inline())
+        return spec.to_zpl()
 
     def _update_quality_warning(self, spec: LabelSpec) -> None:
         layout = calculate_layout_for_lines(
@@ -996,7 +1230,7 @@ class ZebraApp(ctk.CTk):
             try:
                 text = self._build_zpl()
                 error = False
-            except LabelSpecError as exc:
+            except (LabelSpecError, NumberSequenceError, ValueError) as exc:
                 text = f"-- Invalid input --\n{exc}\n"
                 error = True
         self._zpl_window_box.configure(state="normal")
@@ -1520,6 +1754,22 @@ class ZebraApp(ctk.CTk):
         first = self._get_text_lines()[0] if self._get_text_lines() else ""
         self.barcode_text_var.set(first.strip())
         self.barcode_var.set(bool(first.strip()))
+        if self._current_mode() == "text":
+            self.mode_var.set(_mode_label(self.lang, "text_code"))
+            self.settings["mode"] = "text_code"
+            save_settings(self.settings)
+            self._apply_mode_to_ui()
+        self._update_all()
+
+    def _barcode_from_all_text(self) -> None:
+        payload = " | ".join(line.strip() for line in self._get_text_lines() if line.strip())
+        self.barcode_text_var.set(payload)
+        self.barcode_var.set(bool(payload))
+        if self._current_mode() == "text":
+            self.mode_var.set(_mode_label(self.lang, "text_code"))
+            self.settings["mode"] = "text_code"
+            save_settings(self.settings)
+            self._apply_mode_to_ui()
         self._update_all()
 
     def _toggle_barcode(self) -> None:
@@ -1536,6 +1786,9 @@ class ZebraApp(ctk.CTk):
         self._status(self._t("status.new_ready"), COL_SUCCESS)
 
     def _on_print(self, _=None) -> None:
+        if self._current_mode() == "batch":
+            self._open_batch_window()
+            return
         printer = self.printer_var.get()
         if not printer or printer.startswith("(") or printer.startswith("Error") or printer.startswith("[Test mode"):
             self._status(self._t("message.no_printer_title"), COL_WARN)
@@ -1543,16 +1796,18 @@ class ZebraApp(ctk.CTk):
             return
         try:
             spec = self._read_spec()
-        except LabelSpecError as exc:
+            zpl = self._build_zpl()
+            preview_spec = self._preview_spec_for_current_mode(spec)
+        except (LabelSpecError, NumberSequenceError, ValueError) as exc:
             self._status(self._t("message.invalid_input", error=""), COL_ERR)
             messagebox.showwarning(self._t("message.invalid_input", error=""), str(exc))
             return
-        if not spec.has_text:
+        if not preview_spec.has_text and not preview_spec.active_barcode:
             self._status(self._t("message.no_text_title"), COL_WARN)
             messagebox.showwarning(self._t("message.no_text_title"), self._t("message.no_text_body"))
             return
         try:
-            send_zpl_to_printer(printer, spec.to_zpl())
+            send_zpl_to_printer(printer, zpl)
         except RuntimeError as exc:
             self._status(self._t("message.print_error"), COL_ERR)
             messagebox.showerror(self._t("message.print_error"), str(exc))
@@ -1561,7 +1816,7 @@ class ZebraApp(ctk.CTk):
             self._status(self._t("message.error"), COL_ERR)
             messagebox.showerror(self._t("message.error"), str(exc))
             return
-        label = spec.history_label()
+        label = preview_spec.history_label() or preview_spec.barcode_text or self._t("panel.code_only")
         self._status(self._t("status.printed", label=label), COL_SUCCESS)
         self._autosave()
 
@@ -1576,7 +1831,7 @@ class ZebraApp(ctk.CTk):
     def _copy_zpl(self, _=None) -> None:
         try:
             zpl = self._build_zpl()
-        except LabelSpecError as exc:
+        except (LabelSpecError, NumberSequenceError, ValueError) as exc:
             self._status(self._t("message.invalid_input", error=""), COL_ERR)
             messagebox.showwarning(self._t("message.invalid_input", error=""), str(exc))
             return
@@ -1587,7 +1842,7 @@ class ZebraApp(ctk.CTk):
     def _export_zpl(self) -> None:
         try:
             zpl = self._build_zpl()
-        except LabelSpecError as exc:
+        except (LabelSpecError, NumberSequenceError, ValueError) as exc:
             self._status(self._t("message.invalid_input", error=""), COL_ERR)
             messagebox.showwarning(self._t("message.invalid_input", error=""), str(exc))
             return
@@ -1653,6 +1908,16 @@ class ZebraApp(ctk.CTk):
             return False
         self.settings.update(self._spec_to_settings(spec))
         self.settings["printer"] = self.printer_var.get()
+        self.settings["mode"] = self._current_mode()
+        self.settings["show_printer_settings"] = self.show_printer_settings_var.get()
+        self.settings["show_label_settings"] = self.show_label_settings_var.get()
+        self.settings["sequence_start"] = self.sequence_start_var.get()
+        self.settings["sequence_count"] = self.sequence_count_var.get()
+        self.settings["sequence_step"] = self.sequence_step_var.get()
+        self.settings["sequence_padding"] = self.sequence_padding_var.get()
+        self.settings["sequence_prefix"] = self.sequence_prefix_var.get()
+        self.settings["sequence_suffix"] = self.sequence_suffix_var.get()
+        self.settings["sequence_barcode_mode"] = _sequence_barcode_mode_key(self.lang, self.sequence_barcode_mode_var.get())
         save_settings(self.settings)
         return True
 
@@ -1680,6 +1945,7 @@ class ZebraApp(ctk.CTk):
             "offset_x": spec.offset_x,
             "offset_y": spec.offset_y,
             "auto_fit": spec.auto_fit,
+            "mode": self._current_mode(),
         }
 
     def _save_all_settings(self, _=None) -> None:

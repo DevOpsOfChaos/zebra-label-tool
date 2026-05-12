@@ -24,9 +24,12 @@ The project should stay small and technician-friendly. New features should reduc
 - Persistent English/German language selection
 - High-contrast secondary/destructive button styling
 - Main-window layout profiles for common text/code arrangements
+- Mode-based main GUI for text, text+code, code-only, number sequences, sequence+code, and batch labels
+- Collapsible printer and label setup sections
 
 ## Near-term usability
 
+- Review the new mode workflows on Windows with a real user flow and adjust spacing/wording where needed
 - Add real screenshots from Windows
 - Improve visual spacing and iconography after real GUI review
 - Add packaged Windows release build

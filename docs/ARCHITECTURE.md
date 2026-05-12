@@ -68,3 +68,16 @@ Buttons must never reuse card, panel, or background colors. Secondary actions us
 ## Label/code area layout
 
 The layout core supports code areas `above`, `below`, `left`, and `right`. Left/right layouts reserve a side area for barcode/QR/Data Matrix/PDF417 and reduce the text block width accordingly. The existing code size setting is used as the reserved side-area size to keep the main UI compact. The main window also exposes common layout profiles, but they only set existing validated fields rather than introducing a second layout system.
+
+## GUI workflow modes
+
+The desktop app now uses a mode selector to reduce visible controls for normal users. The modes are:
+
+- Text
+- Text + Code
+- Code only + caption
+- Number sequence
+- Number sequence + Code
+- Batch labels
+
+Menus remain available for advanced users, but the main panel shows only the cards that match the selected workflow. Printer and label setup cards can be collapsed so the editor and preview stay dominant.

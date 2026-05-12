@@ -44,6 +44,16 @@ DEFAULT_SETTINGS = {
     "barcode_text": "",
     "history": [],
     "templates": {},
+    "mode": "text",
+    "show_printer_settings": True,
+    "show_label_settings": True,
+    "sequence_start": 1,
+    "sequence_count": 10,
+    "sequence_step": 1,
+    "sequence_padding": 3,
+    "sequence_prefix": "",
+    "sequence_suffix": "",
+    "sequence_barcode_mode": "value",
 }
 
 COL_BG = "#edf1f5"
