@@ -5,6 +5,13 @@ description = "Modern Tauri desktop client for Zebra Label Tool"
 authors = ["DevOpsOfChaos"]
 edition = "2021"
 
+homepage = "https://github.com/DevOpsOfChaos/zebra-label-tool"
+repository = "https://github.com/DevOpsOfChaos/zebra-label-tool"
+license = "MIT"
+
+[package.metadata]
+product-name = "Zebra Label Tool"
+
 [lib]
 name = "zebra_label_tool_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]

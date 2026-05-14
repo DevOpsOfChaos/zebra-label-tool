@@ -469,6 +469,21 @@ TRANSLATIONS["en"].update({
     "sequence.open_full": "Full tool...",
     "message.invalid_short": "invalid",
     "message.line_count": "{count} line{suffix}",
+    "summary.size": "Size {width} x {height} mm @ {dpi} dpi, {copies} copies",
+    "summary.font": "Font {style} size {size}, align {alignment}, rotation {rotation}, line gap {gap}",
+    "summary.options": "Border {border}, inverted {inverted}, code {code}",
+    "summary.on": "on",
+    "summary.off": "off",
+    "summary.copies_one": "1 copy",
+    "summary.copies_many": "{count} copies",
+    "alignment.left": "left",
+    "alignment.center": "center",
+    "alignment.right": "right",
+    "alignment.justify": "justify",
+    "rotation.normal": "normal",
+    "rotation.90": "90°",
+    "rotation.180": "180°",
+    "rotation.270": "270°",
 })
 
 TRANSLATIONS["de"].update({
@@ -500,6 +515,21 @@ TRANSLATIONS["de"].update({
     "sequence.open_full": "Vollständiges Werkzeug...",
     "message.invalid_short": "ungültig",
     "message.line_count": "{count} Zeile{suffix}",
+    "summary.size": "Größe {width} x {height} mm @ {dpi} dpi, {copies}",
+    "summary.font": "Schrift {style} Größe {size}, Ausrichtung {alignment}, Rotation {rotation}, Zeilenabstand {gap}",
+    "summary.options": "Rahmen {border}, Invertiert {inverted}, Code {code}",
+    "summary.on": "an",
+    "summary.off": "aus",
+    "summary.copies_one": "1 Kopie",
+    "summary.copies_many": "{count} Kopien",
+    "alignment.left": "links",
+    "alignment.center": "zentriert",
+    "alignment.right": "rechts",
+    "alignment.justify": "Blocksatz",
+    "rotation.normal": "normal",
+    "rotation.90": "90°",
+    "rotation.180": "180°",
+    "rotation.270": "270°",
 })
 
 

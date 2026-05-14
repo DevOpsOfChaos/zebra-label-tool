@@ -126,23 +126,6 @@ def _sequence_barcode_mode_key(language: str | None, value: str) -> str:
     return "none"
 
 
-def _mode_label(language: str | None, mode: str) -> str:
-    key = str(mode or "text").strip().lower()
-    return translate(language, f"mode.{key}")
-
-
-def _mode_key(language: str | None, value: str) -> str:
-    raw = str(value or "text").strip().lower()
-    for key in LABEL_MODE_KEYS:
-        if raw == key or raw == translate(language, f"mode.{key}").lower() or raw == translate("en", f"mode.{key}").lower() or raw == translate("de", f"mode.{key}").lower():
-            return key
-    return "text"
-
-
-def _mode_labels(language: str | None) -> list[str]:
-    return [_mode_label(language, key) for key in LABEL_MODE_KEYS]
-
-
 def _sequence_barcode_mode_labels(language: str | None) -> list[str]:
     return [_sequence_barcode_mode_label(language, key) for key in SEQUENCE_BARCODE_MODE_KEYS]
 
@@ -359,7 +342,7 @@ class ZebraApp(ctk.CTk):
         text_menu.add_command(label=self._t("action.title_case"), command=lambda: self._format_text("title_case"))
         text_menu.add_separator()
         for alignment in ALIGNMENT_LABELS:
-            text_menu.add_command(label=f"{self._t("field.alignment")}: {alignment}", command=lambda a=alignment: self._set_alignment(a))
+            text_menu.add_command(label=f"{self._t('field.alignment')}: {alignment}", command=lambda a=alignment: self._set_alignment(a))
         menubar.add_cascade(label=self._t("menu.text"), menu=text_menu)
 
         barcode_menu = tk.Menu(menubar, tearoff=False)
@@ -962,13 +945,28 @@ class ZebraApp(ctk.CTk):
         dots_w = mm_to_dots(preview_spec.width_mm, preview_spec.dpi)
         dots_h = mm_to_dots(preview_spec.height_mm, preview_spec.dpi)
         self.preview_info.configure(text=f"{dots_w} x {dots_h} dots  @{preview_spec.dpi} dpi")
+        copies_label = (
+            self._t("summary.copies_one")
+            if int(preview_spec.copies) == 1
+            else self._t("summary.copies_many", count=preview_spec.copies)
+        )
+        alignment_label = _translated_or_fallback(
+            self.lang, f"alignment.{preview_spec.alignment}", str(preview_spec.alignment)
+        )
+        rotation_label = _translated_or_fallback(
+            self.lang, f"rotation.{preview_spec.rotation}", str(preview_spec.rotation)
+        )
+        code_label = (
+            BARCODE_TYPES[preview_spec.barcode_type].label
+            if preview_spec.active_barcode
+            else self._t("summary.off")
+        )
         self.setup_summary_lbl.configure(
             text=(
                 f"{self._t('panel.mode')}: {_mode_label(self.lang, self._current_mode())}\n"
-                f"{_short_number(preview_spec.width_mm)} x {_short_number(preview_spec.height_mm)} mm, {preview_spec.dpi} dpi, {preview_spec.copies} copies\n"
-                f"Font {preview_spec.font_style}, size {preview_spec.font_size}, {preview_spec.alignment}, rotation {preview_spec.rotation}, gap {preview_spec.line_gap}\n"
-                f"Border {'on' if preview_spec.border else 'off'}, inverted {'on' if preview_spec.inverted else 'off'}, "
-                f"code {BARCODE_TYPES[preview_spec.barcode_type].label if preview_spec.active_barcode else 'off'}"
+                f"{self._t('summary.size', width=_short_number(preview_spec.width_mm), height=_short_number(preview_spec.height_mm), dpi=preview_spec.dpi, copies=copies_label)}\n"
+                f"{self._t('summary.font', style=preview_spec.font_style, size=preview_spec.font_size, alignment=alignment_label, rotation=rotation_label, gap=preview_spec.line_gap)}\n"
+                f"{self._t('summary.options', border=self._t('summary.on') if preview_spec.border else self._t('summary.off'), inverted=self._t('summary.on') if preview_spec.inverted else self._t('summary.off'), code=code_label)}"
             )
         )
         self._update_quality_warning(preview_spec)
@@ -1726,7 +1724,7 @@ class ZebraApp(ctk.CTk):
         if self.barcode_text_var.get().strip():
             self.barcode_var.set(True)
         self._update_all()
-        self._status(f"{self._t("field.symbology")}: {barcode_label(barcode_type)}", COL_SUCCESS)
+        self._status(f"{self._t('field.symbology')}: {barcode_label(barcode_type)}", COL_SUCCESS)
 
     def _set_size(self, w, h) -> None:
         self.width_var.set(str(w))
