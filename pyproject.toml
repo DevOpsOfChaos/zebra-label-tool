@@ -36,6 +36,9 @@ dependencies = [
 dev = [
   "pytest>=8.0",
 ]
+build = [
+  "pyinstaller>=6.0",
+]
 
 [project.scripts]
 zebra-label-tool = "zebra_label_tool.cli:main"

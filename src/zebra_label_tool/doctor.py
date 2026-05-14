@@ -75,6 +75,25 @@ def check_environment(*, include_desktop: bool = True, repo_root: Path | None = 
     else:
         results.append(CheckResult("pywin32 / win32print", "INFO", "not required on this non-Windows environment"))
 
+    pyinstaller_available = find_spec("PyInstaller") is not None
+    results.append(
+        CheckResult(
+            "PyInstaller",
+            "OK" if pyinstaller_available else "INFO",
+            "installed; can build dist/ZebraLabelTool.exe via ZebraLabelTool.spec" if pyinstaller_available else "optional; install with `pip install pyinstaller` to build a standalone Windows .exe",
+        )
+    )
+
+    exe_candidates = [root / "dist" / "ZebraLabelTool.exe", root / "ZebraLabelTool.exe"]
+    found_exe = next((candidate for candidate in exe_candidates if candidate.is_file()), None)
+    results.append(
+        CheckResult(
+            "Bundled .exe",
+            "OK" if found_exe else "INFO",
+            str(found_exe) if found_exe else "not built yet; run `pyinstaller ZebraLabelTool.spec --clean --noconfirm` or download a release",
+        )
+    )
+
     desktop_dir = root / "desktop"
     if include_desktop and desktop_dir.exists():
         for command, label in (("node", "Node.js"), ("npm", "npm"), ("cargo", "Cargo")):

@@ -44,6 +44,19 @@ That is the entire loop. Anything advanced lives in dropdown menus.
 - **Keyboard-first workflow** — see shortcuts below
 - **CLI mode** for generating ZPL without launching the GUI
 
+## Easiest way to start (Windows)
+
+You do **not** need Python, Node, or Rust to use the tool.
+
+1. Open the [Releases](https://github.com/DevOpsOfChaos/zebra-label-tool/releases) page.
+2. Download `ZebraLabelTool.exe` from the latest release.
+3. Double-click it. The first launch asks for **Deutsch / English** and remembers your choice.
+4. Add the file to your Desktop or pin it to Start for one-click access.
+
+It is a single-file executable (no installer, no admin rights). The Tauri client is also available as `.msi` / NSIS `.exe` on the same release page if you prefer an installer experience.
+
+If the repository is checked out locally, the `Start-ZebraLabelTool.bat` / `Start-ZebraLabelTool.ps1` launcher scripts pick the right path automatically: prebuilt `.exe` first, otherwise the local Python venv.
+
 ## Screenshots
 
 Real screenshots intentionally not committed yet. Drop verified Windows captures into `docs/screenshots/`:
@@ -211,6 +224,40 @@ pytest -q
 ```
 
 `pytest -q` runs the full core suite. The GUI is not unit-tested directly; instead, `tests/test_gui_shortcuts_source.py` keeps the menu shortcut wiring honest.
+
+## Building a standalone Windows .exe
+
+```powershell
+pip install pyinstaller
+pyinstaller ZebraLabelTool.spec --clean --noconfirm
+```
+
+Output: `dist/ZebraLabelTool.exe` (single-file, windowed, ~14 MB). The spec bundles CustomTkinter themes, the `qrcode` encoding tables, and uses `desktop/src-tauri/icons/icon.ico` for the binary icon. UPX compression is intentionally disabled to reduce Windows SmartScreen / antivirus false-positives.
+
+## Building a Tauri installer
+
+```powershell
+cd desktop
+npm ci
+npm run tauri build
+```
+
+Output lands in `desktop/src-tauri/target/release/bundle/` (`.msi` and NSIS `.exe`). Requires Rust + MSVC Build Tools + WebView2 + Node.js. Run `npm run doctor` first.
+
+## Releases
+
+Pushing a tag named `v*` triggers `.github/workflows/release.yml`, which:
+
+1. builds `dist/ZebraLabelTool.exe` via PyInstaller on `windows-latest`,
+2. builds the Tauri `.msi` / NSIS `.exe` (best-effort, does not block the release on Tauri failures),
+3. attaches every artifact to the matching GitHub Release with auto-generated notes.
+
+To cut a release manually:
+
+```powershell
+git tag v0.2.0
+git push origin v0.2.0
+```
 
 ## Contributing
 
