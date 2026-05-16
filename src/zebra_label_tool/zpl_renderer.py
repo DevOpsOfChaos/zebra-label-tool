@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import io
 import logging
-import ssl
 import os
+import ssl
+import sys
 import urllib.error
 import urllib.request
 from typing import TYPE_CHECKING
@@ -410,35 +411,105 @@ def _draw_centered_text(
 # ---------------------------------------------------------------------------
 
 _FONT_CACHE: dict[int, ImageFont.FreeTypeFont] = {}
+_EMBEDDED_FONT_PATH: str | None = None
+
+
+def _get_embedded_font_path() -> str | None:
+    """Return the absolute path to the bundled DejaVuSansMono-Bold.ttf, or None."""
+    global _EMBEDDED_FONT_PATH
+    if _EMBEDDED_FONT_PATH is not None:
+        return _EMBEDDED_FONT_PATH if os.path.isfile(_EMBEDDED_FONT_PATH) else None
+
+    # Look relative to this module's location (works in PyInstaller too)
+    candidates = []
+    try:
+        base = os.path.dirname(os.path.abspath(__file__))
+        candidates.append(os.path.join(base, "fonts", "DejaVuSansMono-Bold.ttf"))
+    except NameError:
+        pass
+
+    # Also try relative to CWD
+    candidates.append(os.path.join("src", "zebra_label_tool", "fonts", "DejaVuSansMono-Bold.ttf"))
+    candidates.append(os.path.join("zebra_label_tool", "fonts", "DejaVuSansMono-Bold.ttf"))
+
+    # PyInstaller _MEIPASS directory
+    sys_meipass = getattr(sys, "_MEIPASS", None)
+    if sys_meipass:
+        candidates.append(os.path.join(sys_meipass, "zebra_label_tool", "fonts", "DejaVuSansMono-Bold.ttf"))
+
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            _EMBEDDED_FONT_PATH = candidate
+            return candidate
+
+    return None
 
 
 def _get_monospace_font(size: int) -> ImageFont.FreeTypeFont:
-    """Return a monospace TrueType font at the requested pixel size."""
+    """Return a monospace TrueType font at the requested pixel size.
+
+    Priority order:
+    1. Bundled DejaVuSansMono-Bold.ttf (always available in EXE)
+    2. System Courier New Bold / Regular (C:\\Windows\\Fonts)
+    3. Consolas / Lucida Console
+    4. Any .ttf file found in C:\\Windows\\Fonts
+    5. Pillow's built-in default (tiny bitmap — fallback only)
+    """
     if size in _FONT_CACHE:
         return _FONT_CACHE[size]
 
-    font_names: list[str] = []
-    if os.name == "nt":
-        font_names = [
-            os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "courbd.ttf"),
-            os.path.join(os.environ.get("WINDIR", r"C:\Windows"), "Fonts", "cour.ttf"),
-        ]
-    font_names += [
-        "Courier New",
-        "Courier",
-        "DejaVuSansMono.ttf",
-        "FreeMono.ttf",
-    ]
+    # 1 — Bundled font (always present)
+    embedded = _get_embedded_font_path()
+    if embedded:
+        try:
+            f = ImageFont.truetype(embedded, size)
+            _FONT_CACHE[size] = f
+            return f
+        except (OSError, IOError, Exception):
+            logger.debug("Bundled font failed: %s", embedded)
 
-    for name in font_names:
+    # 2 — System monospace fonts (absolute paths, most reliable)
+    windir = os.environ.get("WINDIR") or r"C:\Windows"
+    sys_paths = [
+        os.path.join(windir, "Fonts", "courbd.ttf"),
+        os.path.join(windir, "Fonts", "cour.ttf"),
+        os.path.join(windir, "Fonts", "consola.ttf"),
+        os.path.join(windir, "Fonts", "lucon.ttf"),
+    ]
+    for path in sys_paths:
+        if os.path.isfile(path):
+            try:
+                f = ImageFont.truetype(path, size)
+                _FONT_CACHE[size] = f
+                return f
+            except (OSError, IOError, Exception):
+                continue
+
+    # 3 — Font names (Pillow's FreeType search, may fail in EXE)
+    for name in ["Courier New", "Consolas", "Lucida Console", "Courier"]:
         try:
             f = ImageFont.truetype(name, size)
             _FONT_CACHE[size] = f
             return f
-        except (OSError, IOError):
+        except (OSError, IOError, Exception):
             continue
 
-    logger.warning("No monospace font found, using PIL default")
+    # 4 — Scan for ANY TrueType font (last resort before default)
+    fonts_dir = os.path.join(windir, "Fonts")
+    if os.path.isdir(fonts_dir):
+        for entry in os.listdir(fonts_dir):
+            if entry.lower().endswith(".ttf"):
+                try:
+                    path = os.path.join(fonts_dir, entry)
+                    f = ImageFont.truetype(path, size)
+                    logger.warning("Using fallback font: %s", path)
+                    _FONT_CACHE[size] = f
+                    return f
+                except (OSError, IOError, Exception):
+                    continue
+
+    # 5 — Emergency: Pillow bitmap default (tiny, will look bad)
+    logger.error("NO TrueType font found! Using 8px bitmap default — preview will be broken.")
     f = ImageFont.load_default()
     _FONT_CACHE[size] = f
     return f

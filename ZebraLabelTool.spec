@@ -33,6 +33,7 @@ hiddenimports = (
 datas = (
     collect_data_files('customtkinter')
     + collect_data_files('qrcode')
+    + [('src/zebra_label_tool/fonts/DejaVuSansMono-Bold.ttf', 'zebra_label_tool/fonts/DejaVuSansMono-Bold.ttf')]
 )
 
 a = Analysis(
