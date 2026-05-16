@@ -18,11 +18,14 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 hiddenimports = (
     collect_submodules('customtkinter')
     + collect_submodules('qrcode')
+    + collect_submodules('PIL')
     + [
         'zebra_label_tool',
         'zebra_label_tool.app',
         'zebra_label_tool.cli',
         'zebra_label_tool.printing',
+        'zebra_label_tool.zpl_renderer',
+        'zebra_label_tool.preview',
     ]
 )
 

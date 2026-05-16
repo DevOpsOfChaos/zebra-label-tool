@@ -41,6 +41,7 @@ from .number_sequences import NumberSequenceError, build_number_sequence_specs, 
 from .layout import calculate_layout_for_lines, mm_to_dots
 from .presets import BUILTIN_PRESETS, get_builtin_preset, render_preset_settings
 from .preview import LabelPreviewCanvas
+from .zpl_renderer import render_zpl_preview
 from .printing import get_printers, send_zpl_to_printer
 from .settings import load_settings, save_settings
 from .text_tools import normalize_editor_text, transform_lines, wrap_lines
@@ -970,28 +971,67 @@ class ZebraApp(ctk.CTk):
             )
         )
         self._update_quality_warning(preview_spec)
-        self.preview_canvas.update_preview(
-            lines=preview_spec.text_lines,
-            width_mm=preview_spec.width_mm,
-            height_mm=preview_spec.height_mm,
-            font_size=preview_spec.font_size,
-            dpi=preview_spec.dpi,
-            inverted=preview_spec.inverted,
-            border=preview_spec.border,
-            barcode=preview_spec.barcode,
-            barcode_text=preview_spec.barcode_text,
-            barcode_pos=preview_spec.barcode_pos,
-            barcode_type=preview_spec.barcode_type,
-            barcode_height=preview_spec.barcode_height,
-            barcode_show_text=preview_spec.barcode_show_text,
-            barcode_magnification=preview_spec.barcode_magnification,
-            alignment=preview_spec.alignment,
-            rotation=preview_spec.rotation,
-            line_gap=preview_spec.line_gap,
-            offset_x=preview_spec.offset_x,
-            offset_y=preview_spec.offset_y,
-            auto_fit=preview_spec.auto_fit,
-        )
+        # --- Render ZPL preview (Labelary API / Pillow fallback) -----------
+        try:
+            first_zpl = preview_spec.to_zpl()
+            layout = calculate_layout_for_lines(
+                preview_spec.text_lines,
+                width_mm=preview_spec.width_mm,
+                height_mm=preview_spec.height_mm,
+                font_size=preview_spec.font_size,
+                dpi=preview_spec.dpi,
+                barcode=preview_spec.barcode,
+                barcode_text=preview_spec.barcode_text,
+                barcode_pos=preview_spec.barcode_pos,
+                line_gap=preview_spec.line_gap,
+                offset_x=preview_spec.offset_x,
+                offset_y=preview_spec.offset_y,
+                auto_fit=preview_spec.auto_fit,
+                barcode_height=preview_spec.barcode_height,
+            )
+            preview_img, render_method = render_zpl_preview(
+                first_zpl,
+                layout=layout,
+                width_mm=preview_spec.width_mm,
+                height_mm=preview_spec.height_mm,
+                dpi=preview_spec.dpi,
+                text_lines=preview_spec.text_lines,
+                inverted=preview_spec.inverted,
+                border=preview_spec.border,
+                alignment=preview_spec.alignment,
+                barcode_type=preview_spec.barcode_type,
+                barcode_text=preview_spec.barcode_text,
+                barcode_show_text=preview_spec.barcode_show_text,
+                barcode_magnification=preview_spec.barcode_magnification,
+                font_size=preview_spec.font_size,
+                line_gap=preview_spec.line_gap,
+            )
+            self.preview_canvas.show_zpl_image(preview_img, render_method)
+        except Exception as _zpl_render_err:
+            # Fallback to old Canvas-based preview
+            self.preview_canvas.update_preview(
+                lines=preview_spec.text_lines,
+                width_mm=preview_spec.width_mm,
+                height_mm=preview_spec.height_mm,
+                font_size=preview_spec.font_size,
+                dpi=preview_spec.dpi,
+                inverted=preview_spec.inverted,
+                border=preview_spec.border,
+                barcode=preview_spec.barcode,
+                barcode_text=preview_spec.barcode_text,
+                barcode_pos=preview_spec.barcode_pos,
+                barcode_type=preview_spec.barcode_type,
+                barcode_height=preview_spec.barcode_height,
+                barcode_show_text=preview_spec.barcode_show_text,
+                barcode_magnification=preview_spec.barcode_magnification,
+                alignment=preview_spec.alignment,
+                rotation=preview_spec.rotation,
+                line_gap=preview_spec.line_gap,
+                offset_x=preview_spec.offset_x,
+                offset_y=preview_spec.offset_y,
+                auto_fit=preview_spec.auto_fit,
+            )
+
         self._refresh_zpl_window(self._build_zpl())
 
     def _build_zpl(self) -> str:
