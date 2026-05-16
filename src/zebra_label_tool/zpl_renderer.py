@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-LABELARY_BASE_URL = "http://api.labelary.com/v1/print"
+LABELARY_BASE_URL = "https://api.labelary.com/v1/print"
 _REQUEST_TIMEOUT = 15  # seconds for Labelary API calls
 
 
@@ -195,7 +195,7 @@ def _pillow_render(
     draw = ImageDraw.Draw(img)
 
     # --- font ---------------------------------------------------------------
-    font_pt = font_size * 72.0 / dpi * render_scale
+    font_pt = layout.fs * 72.0 / dpi
     font = _get_monospace_font(max(1, round(font_pt)))
 
     # --- text area ----------------------------------------------------------
