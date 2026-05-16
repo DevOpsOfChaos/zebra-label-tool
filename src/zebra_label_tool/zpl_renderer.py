@@ -51,7 +51,7 @@ def render_zpl_preview(
     barcode_magnification: int = 4,
     font_size: int = 58,
     line_gap: int = 10,
-) -> tuple[Image.Image, str]:
+) -> tuple[Image.Image | None, str]:
     """Render a label preview — tries Labelary first, falls back to Pillow.
 
     Returns
@@ -88,9 +88,9 @@ def render_zpl_preview(
     if img is not None:
         return img, "pillow"
 
-    # 3) Absolute emergency — 1x1 transparent pixel
+    # 3) Both renderers failed
     logger.error("Both Labelary and Pillow renderers failed")
-    return Image.new("RGBA", (1, 1), (0, 0, 0, 0)), "error"
+    return None, "error"
 
 
 # ---------------------------------------------------------------------------

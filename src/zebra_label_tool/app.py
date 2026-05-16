@@ -972,6 +972,8 @@ class ZebraApp(ctk.CTk):
         )
         self._update_quality_warning(preview_spec)
         # --- Render ZPL preview (Labelary API / Pillow fallback) -----------
+        preview_img = None
+        render_method = ""
         try:
             first_zpl = preview_spec.to_zpl()
             layout = calculate_layout_for_lines(
@@ -1006,9 +1008,13 @@ class ZebraApp(ctk.CTk):
                 font_size=preview_spec.font_size,
                 line_gap=preview_spec.line_gap,
             )
+        except Exception:
+            pass
+
+        if preview_img is not None and render_method != "error":
             self.preview_canvas.show_zpl_image(preview_img, render_method)
-        except Exception as _zpl_render_err:
-            # Fallback to old Canvas-based preview
+        else:
+            # Fallback to Canvas-based preview (Courier New monospace)
             self.preview_canvas.update_preview(
                 lines=preview_spec.text_lines,
                 width_mm=preview_spec.width_mm,
