@@ -19,6 +19,7 @@ hiddenimports = (
     collect_submodules('customtkinter')
     + collect_submodules('qrcode')
     + collect_submodules('PIL')
+    + collect_submodules('certifi')
     + [
         'zebra_label_tool',
         'zebra_label_tool.app',

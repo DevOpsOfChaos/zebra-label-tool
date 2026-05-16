@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import logging
+import ssl
 import os
 import urllib.error
 import urllib.request
@@ -104,17 +105,36 @@ def _render_via_labelary(
     """POST the ZPL to Labelary and return the rendered PNG, or *None*."""
     url = f"{LABELARY_BASE_URL}/{dpi}/label/{width_mm}mmx{height_mm}mm/1/"
     data = zpl.encode("utf-8")
+
+    # Build an SSL context.  In the PyInstaller-frozen EXE the system CA
+    # store may be unreachable, so we first try certifi's bundled bundle
+    # and fall back to unverified as a last resort.
+    ctx = None
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        try:
+            ctx = ssl.create_default_context()
+        except Exception:
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+
     req = urllib.request.Request(
         url,
         data=data,
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=_REQUEST_TIMEOUT) as resp:
+        with urllib.request.urlopen(req, timeout=_REQUEST_TIMEOUT, context=ctx) as resp:
             png_bytes = resp.read()
         return Image.open(io.BytesIO(png_bytes)).convert("RGB")
     except urllib.error.URLError as exc:
         logger.info("Labelary API unreachable: %s", exc)
+        # Log details for debugging
+        if hasattr(exc, "reason"):
+            logger.debug("  Reason: %s", exc.reason)
     except OSError as exc:
         logger.warning("Labelary returned invalid image data: %s", exc)
     except Exception as exc:
